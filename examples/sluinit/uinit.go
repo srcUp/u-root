@@ -13,9 +13,9 @@ import (
 )
 
 type launcher struct {
-	Type   string
-	Cmd    string
-	Params []string
+	Type   string   `json:"type"`
+	Cmd    string   `json:"cmd"`
+	Params []string `json:"params"`
 }
 
 func (l *launcher) Boot() {
@@ -34,8 +34,8 @@ func (l *launcher) Boot() {
 type policy struct {
 	DefaultAction string
 	Collectors    []measurement.Collector
-	//Attestors []Attestor
-	Launcher launcher
+	//Attestor      []attestation.Attestor
+	Launcher      launcher
 }
 
 func locateSLPolicy() ([]byte, error) {
@@ -47,12 +47,43 @@ func locateSLPolicy() ([]byte, error) {
 	// Read in policy file
 }
 
-func parseSLPolicy(p []byte) (policy, error) {
-	// Parse the policy and use to instantiate,
-	// 	- Collector(s)
-	// 	- Attestor
-	// 	- Launcher
-	// Populate instance of policy structure and return
+func parseSLPolicy(pf []byte) (*policy, error) {
+	p := &policy{}
+	var parse struct {
+		DefaultAction string            `json:"default_action"`
+		Collectors    []json.RawMessage `json:"collectors"`
+		Attestor      json.RawMessage   `json:"attestor"`
+		Launcher      json.RawMessage   `json:"launcher`
+	}
+
+	if err := json.Unmarshal(pf, &parse); err != nil {
+		return nil, err
+	}
+
+	p.DefaultAction = parse.DefaultAction
+
+	for _, c := range parse.Collectors {
+		if collector, err := measurement.GetCollector(c); err != nil {
+			return nil, err
+		}
+		p.Collectors = append(p.Collectors, collector)
+	}
+
+	/* TODO
+	if len(parse.Attestor) > 0 {
+		if p.Attestor, err = attestation.GetAttestor(parse.Attestor); err != nil {
+			return nil, err
+		}
+	}
+	*/
+
+	if len(parse.Launcher) > 0 {
+		if err := json.Unmarshal(parse.Launcher, &p.Launcher); err != nil {
+			return nil, err
+		}
+	}
+
+	return p, nil
 }
 
 func main() {
