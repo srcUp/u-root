@@ -5,11 +5,19 @@
 package main
 
 import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io/ioutil"
+	"log"
 	"os"
 	"os/exec"
+	"u-root/pkg/cmdline"
+	"u-root/pkg/diskboot"
+	"u-root/pkg/find"
+	"u-root/pkg/measurement"
 
 	"github.com/TrenchBoot/tpmtool/pkg/tpm"
-	"github.com/TrenchBoot/u-root/pkg/measurement"
 )
 
 type launcher struct {
@@ -35,16 +43,68 @@ type policy struct {
 	DefaultAction string
 	Collectors    []measurement.Collector
 	//Attestor      []attestation.Attestor
-	Launcher      launcher
+	Launcher launcher
 }
 
 func locateSLPolicy() ([]byte, error) {
+	log.Printf("Checking if sl_policy is set")
 	// Check of kernel param sl_policy is set,
-	// 	- parse the string
-	// Iterate through each local block device,
-	// 	- mount the block device
+	// - parse the string
+	if val, ok := cmdline.Flag("sl_policy"); ok {
+		log.Printf("sl_policy flag is set with val=%s", val)
+		// val contains value of sl_policy set. what is this ?
+		// return when a policy file is found
+		fmt.Println(val)
+	}
+
+	log.Printf("Searching for all block devices")
+	// FindDevices fn iterates over all local block devices and mounts them.
+	devices := diskboot.FindDevices("/sys/class/block/*")
+	if len(devices) == 0 {
+		return nil, errors.New("No devices found")
+	}
+
 	// 	- scan for securelaunch.policy under /, /efi, or /boot
-	// Read in policy file
+	var SearchRoots = []string{
+		"/",
+		"/efi",
+		"/boot",
+	}
+
+	for _, c := range SearchRoots {
+		log.Printf("Finding securelaunch.policy file under %s", c)
+		f, err := find.New(func(f *find.Finder) error {
+			f.Root = c
+			f.Pattern = "securelaunch.policy"
+			return nil
+		})
+
+		if err != nil {
+			// couldn't create anonymous function
+			log.Printf("couldn't create anonymous function")
+		}
+		go f.Find()
+
+		if len(f.Names) == 0 {
+			log.Printf("No policy file found under %s, continuing", c)
+			continue
+		}
+
+		// Read in policy file:
+		for o := range f.Names {
+			if o.Err != nil {
+				log.Printf("%v: got %v, want nil", o.Name, o.Err)
+			}
+			d, err := ioutil.ReadFile(o.Name)
+			if err != nil {
+				log.Printf("Error reading policy file found under %s, continuing", c)
+				continue
+			}
+			// return when first policy file found
+			return d, nil
+		}
+	}
+	return nil, errors.New("Policy File not found")
 }
 
 func parseSLPolicy(pf []byte) (*policy, error) {
@@ -63,7 +123,8 @@ func parseSLPolicy(pf []byte) (*policy, error) {
 	p.DefaultAction = parse.DefaultAction
 
 	for _, c := range parse.Collectors {
-		if collector, err := measurement.GetCollector(c); err != nil {
+		collector, err := measurement.GetCollector(c)
+		if err != nil {
 			return nil, err
 		}
 		p.Collectors = append(p.Collectors, collector)
@@ -87,21 +148,24 @@ func parseSLPolicy(pf []byte) (*policy, error) {
 }
 
 func main() {
-	tpm := tpm.NewTPM()
+	log.Printf("testing printf in live environment\n")
+	tpm, err := tpm.NewTPM()
 
 	// Request TPM locality 2, requires extending go-tpm for locality request
 
 	rawBytes, err := locateSLPolicy()
-	if err {
+	if err != nil {
+		log.Printf("locateSLPolicy failed with err=%v", err)
 		//need to decide how to bail, reboot, error msg & halt, or
 		//recovery shell
 	}
 
+	return
 	// The policy file must be measured and extended into PCR21 (PCR15
 	// until DRTM launch is working and able to set locality
 
 	p, err := parseSLPolicy(rawBytes)
-	if err {
+	if err != nil {
 		//need to decide how to bail, reboot, error msg & halt, or
 		//recovery shell
 	}

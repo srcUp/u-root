@@ -2,6 +2,7 @@ package measurement
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/TrenchBoot/tpmtool/pkg/tpm"
 )
@@ -12,6 +13,8 @@ type Collector interface {
 
 var supportedCollectors = map[string]func([]byte) (Collector, error){
 	"storage": NewStorageCollector,
+	"dmi":     NewDmiCollector,
+	"files":   NewFileCollector,
 }
 
 func GetCollector(config []byte) (Collector, error) {
@@ -27,5 +30,5 @@ func GetCollector(config []byte) (Collector, error) {
 		return init(config)
 	}
 
-	return nil, errors.New("unsupported collector %s", header.Type)
+	return nil, fmt.Errorf("unsupported collector %s", header.Type)
 }
