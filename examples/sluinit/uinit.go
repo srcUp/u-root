@@ -16,6 +16,7 @@ import (
 	"u-root/pkg/diskboot"
 	"u-root/pkg/find"
 	"u-root/pkg/measurement"
+	"u-root/pkg/mount"
 
 	"github.com/TrenchBoot/tpmtool/pkg/tpm"
 )
@@ -46,64 +47,98 @@ type policy struct {
 	Launcher launcher
 }
 
+func scanBlockDevice(devicepath string) ([]byte, error) {
+	log.Printf("Finding securelaunch.policy file under %s", devicepath)
+	f, err := find.New(func(f *find.Finder) error {
+		f.Root = devicepath
+		f.Pattern = "securelaunch.policy"
+		return nil
+	})
+
+	if err != nil {
+		// couldn't create anonymous function
+		log.Printf("couldn't create anonymous function")
+	}
+	go f.Find()
+
+	// check if calling len(channel) is safe.
+	if len(f.Names) == 0 {
+		log.Printf("No policy file found under %s, continuing", devicepath)
+		return nil, fmt.Errorf("No policy file found under %s", devicepath)
+	}
+
+	// Read in policy file:
+	for o := range f.Names {
+		if o.Err != nil {
+			log.Printf("%v: got %v, want nil", o.Name, o.Err)
+		}
+		d, err := ioutil.ReadFile(o.Name)
+		if err != nil {
+			log.Printf("Error reading policy file found under %s, continuing", o.Name)
+			continue
+		}
+		// return when first policy file found
+		return d, nil
+	}
+	return nil, fmt.Errorf("Unable to read any of the policy files under %s.Exiting scanBlockDevice() ", devicepath)
+}
+
 func locateSLPolicy() ([]byte, error) {
+
+	// Override: Check of kernel param sl_policy is set, - parse the string
 	log.Printf("Checking if sl_policy is set")
-	// Check of kernel param sl_policy is set,
-	// - parse the string
 	if val, ok := cmdline.Flag("sl_policy"); ok {
 		log.Printf("sl_policy flag is set with val=%s", val)
-		// val contains value of sl_policy set. what is this ?
 		// return when a policy file is found
 		fmt.Println(val)
 	}
 
-	log.Printf("Searching for all block devices")
+	log.Printf("Searching for securelaunch.policy on all block devices")
 	// FindDevices fn iterates over all local block devices and mounts them.
 	devices := diskboot.FindDevices("/sys/class/block/*")
 	if len(devices) == 0 {
-		return nil, errors.New("No devices found")
+		log.Printf("No block devices found. Scanning policy file elsewhere.")
+	} else {
+		log.Printf("Some block devices detected.")
+		for _, device := range devices {
+			devicepath := device.DevPath
+			log.Printf("Scanning for policy file under %s", devicepath)
+			// diskboot.FindDevice would return the /dev/foo path.
+			raw, err := scanBlockDevice(devicepath)
+			if e := mount.Unmount(devicepath, true, false); e != nil {
+				log.Printf("Unmount failed for %s. PANIC", devicepath)
+				panic(e)
+			}
+
+			if err != nil {
+				log.Printf("Policy File not found under %s. Moving on to next device.", devicepath)
+				continue
+			}
+			log.Printf("Policy File found under %s. Exiting locateSLPolicy()", devicepath)
+			return raw, nil
+		}
 	}
 
-	// 	- scan for securelaunch.policy under /, /efi, or /boot
+	// scan for securelaunch.policy under /, /efi, or /boot
 	var SearchRoots = []string{
 		"/",
 		"/efi",
 		"/boot",
 	}
-
 	for _, c := range SearchRoots {
-		log.Printf("Finding securelaunch.policy file under %s", c)
-		f, err := find.New(func(f *find.Finder) error {
-			f.Root = c
-			f.Pattern = "securelaunch.policy"
-			return nil
-		})
+		raw, err := scanBlockDevice(c)
+		if e := mount.Unmount(c, true, false); e != nil {
+			log.Printf("Unmount failed for %s. PANIC", c)
+			panic(e)
+		}
 
 		if err != nil {
-			// couldn't create anonymous function
-			log.Printf("couldn't create anonymous function")
-		}
-		go f.Find()
-
-		if len(f.Names) == 0 {
-			log.Printf("No policy file found under %s, continuing", c)
+			log.Printf("Policy File not found under %s. Moving on to next device.", c)
 			continue
 		}
-
-		// Read in policy file:
-		for o := range f.Names {
-			if o.Err != nil {
-				log.Printf("%v: got %v, want nil", o.Name, o.Err)
-			}
-			d, err := ioutil.ReadFile(o.Name)
-			if err != nil {
-				log.Printf("Error reading policy file found under %s, continuing", c)
-				continue
-			}
-			// return when first policy file found
-			return d, nil
-		}
+		return raw, nil
 	}
+
 	return nil, errors.New("Policy File not found")
 }
 
