@@ -93,6 +93,11 @@ func locateSLPolicy() ([]byte, error) {
 		fmt.Println(val)
 	}
 
+	cmd := exec.Command("modprobe", "-S 4.14.35-1838.el7uek.x86_64", "ata_generic")
+	if _, err := cmd.CombinedOutput(); err != nil {
+		log.Printf("err not nil from modprobe: %v", err)
+	}
+
 	log.Printf("Searching for securelaunch.policy on all block devices")
 	// FindDevices fn iterates over all local block devices and mounts them.
 	devices := diskboot.FindDevices("/sys/class/block/*")
