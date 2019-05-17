@@ -12,6 +12,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"strings"
 	"u-root/pkg/cmdline"
 	"u-root/pkg/diskboot"
 	"u-root/pkg/find"
@@ -84,13 +85,31 @@ func scanBlockDevice(devicepath string) ([]byte, error) {
 }
 
 func locateSLPolicy() ([]byte, error) {
-
 	// Override: Check of kernel param sl_policy is set, - parse the string
+	// <block device identifier>:<path>
+	// e.g 1 sda:/boot/securelaunch.policy
+	// e.g 2 77d8da74-a690-481a-86d5-9beab5a8e842:/boot/securelaunch.policy
+	// TODO: <block device identifier>:<mount options>,<path>
 	log.Printf("Checking if sl_policy is set")
 	if val, ok := cmdline.Flag("sl_policy"); ok {
 		log.Printf("sl_policy flag is set with val=%s", val)
-		// return when a policy file is found
 		fmt.Println(val)
+		s := strings.Split(val, ":")
+		if len(s) != 2 {
+			log.Printf("incorrect format of sl_policy variable")
+		} else {
+			deviceId := s[0]
+			devicePath := s[1]
+			log.Printf("Policy file found at %s on device %s", devicePath, deviceId)
+			// mount the first one and read the file.
+			d, err := ioutil.ReadFile(devicePath)
+			if err != nil {
+				log.Printf("Error reading policy file found at %s under %s", devicePath, deviceId)
+			} else {
+				// return when first policy file found
+				return d, nil
+			}
+		}
 	}
 
 	cmd := exec.Command("modprobe", "-S", "4.14.35-1838.el7uek.x86_64", "ata_generic")
