@@ -156,8 +156,10 @@ func (o Options) fromBytesCheckEnd(data []byte, checkEndOption bool) error {
 	}
 
 	// Any bytes left must be padding.
+	var pad uint8
 	for buf.Len() >= 1 {
-		if buf.Read8() != optPad {
+		pad = buf.Read8()
+		if pad != optPad && pad != optEnd {
 			return ErrInvalidOptions
 		}
 	}
@@ -173,7 +175,7 @@ func (o Options) sortedKeys() []int {
 		codes = append(codes, int(k))
 	}
 
-	sort.Sort(sort.IntSlice(codes))
+	sort.Ints(codes)
 	return codes
 }
 
@@ -342,6 +344,9 @@ func getOption(code OptionCode, data []byte, vendorDecoder OptionDecoder) fmt.St
 
 	case OptionVendorSpecificInformation:
 		d = vendorDecoder
+
+	case OptionClasslessStaticRoute:
+		d = &Routes{}
 	}
 	if d != nil && d.FromBytes(data) == nil {
 		return d
