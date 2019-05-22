@@ -100,28 +100,35 @@ func scanBlockDevice(mountPath string) ([]byte, error) {
 	return nil, fmt.Errorf("No policy file found _OR_ if found, error reading them. Exiting scanBlockDevice() for %s", mountPath)
 }
 
+/*locateSLPolicy()
+Check of kernel param sl_policy is set,
+	- parse the string
+Iterate through each local block device,
+	- mount the block device
+	- scan for securelaunch.policy under /, /efi, or /boot
+Read in policy file
+*/
 func locateSLPolicy() ([]byte, error) {
-	// Override: Check of kernel param sl_policy is set, - parse the string
-	// <block device identifier>:<path>
-	// e.g 1 sda:/boot/securelaunch.policy
-	// e.g 2 77d8da74-a690-481a-86d5-9beab5a8e842:/boot/securelaunch.policy
-	// TODO: <block device identifier>:<mount options>,<path>
 	log.Printf("Checking if sl_policy is set")
 	if val, ok := cmdline.Flag("sl_policy"); ok {
+		// format sl_policy=<block device identifier>:<path>
+		// e.g 1 sda:/boot/securelaunch.policy
+		// e.g 2 77d8da74-a690-481a-86d5-9beab5a8e842:/boot/securelaunch.policy
+		// TODO: <block device identifier>:<mount options>,<path>
 		log.Printf("sl_policy flag is set with val=%s", val)
-		fmt.Println(val)
 		s := strings.Split(val, ":")
 		if len(s) != 2 {
-			log.Printf("incorrect format of sl_policy cmd line parameter")
+			log.Printf("incorrect format of sl_policy cmd line parameter. correct format sl_policy=<block device identifier>:<path>")
 			log.Printf("I will be nice. Instead of quiting on you. Will search block devices for you in case you put the file there")
 		} else {
 			deviceId := s[0]
-			devicePath := s[1]
-			log.Printf("Policy file found at %s on device %s", devicePath, deviceId)
+			devicePath := filepath.Join("/dev", s[0]) // assumes s[0] is sda, devicePath=/dev/sda
 			// mount the first one and read the file.
-			d, err := ioutil.ReadFile(devicePath)
+			dev := diskboot.FindDevice(devicePath) // mount the /dev/sda.
+			mountPath := dev.MountPath + s[1]      // mountPath will /tmp/slaunch.policy if /dev/sda mounted on /tmp
+			d, err := ioutil.ReadFile(mountPath)
 			if err != nil {
-				log.Printf("Error reading policy file found at %s under %s", devicePath, deviceId)
+				log.Printf("Error reading policy file found at mountPath=%s, devicePath=%s, passed=%s", mountPath, devicePath, val)
 			} else {
 				// return when first policy file found
 				return d, nil
