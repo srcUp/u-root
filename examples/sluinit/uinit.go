@@ -48,40 +48,56 @@ type policy struct {
 	Launcher launcher
 }
 
-func scanBlockDevice(devicepath string) ([]byte, error) {
-	log.Printf("Finding securelaunch.policy file under %s", devicepath)
-	f, err := find.New(func(f *find.Finder) error {
-		f.Root = devicepath
-		f.Pattern = "securelaunch.policy"
-		return nil
-	})
+/* recursively scans an already mounted block device inside directories
+	"/", "/efi" and "/boot" for policy file
 
-	if err != nil {
-		// couldn't create anonymous function
-		log.Printf("couldn't create anonymous function")
-	}
-	go f.Find()
+	e.g: if you mount /dev/sda1 on /tmp/sda1,
+ 	then mountPath would be /tmp/sda1
+ 	and searchPath would be /tmp/sda1/, /tmp/sda1/efi, and /tmp/sda1/boot
+		respectively for each iteration of loop over SearchRoots slice.
+*/
+func scanBlockDevice(mountPath string) ([]byte, error) {
+	log.Printf("Finding securelaunch.policy file under %s", mountPath)
+	// scan for securelaunch.policy under /, /efi, or /boot
+	var SearchRoots = []string{"/", "/efi", "/boot"}
+	for _, c := range SearchRoots {
 
-	// check if calling len(channel) is safe.
-	if len(f.Names) == 0 {
-		log.Printf("No policy file found under %s, continuing", devicepath)
-		return nil, fmt.Errorf("No policy file found under %s", devicepath)
-	}
+		searchPath := mountPath + c
+		f, err := find.New(func(f *find.Finder) error {
+			f.Root = searchPath
+			f.Pattern = "securelaunch.policy"
+			return nil
+		})
 
-	// Read in policy file:
-	for o := range f.Names {
-		if o.Err != nil {
-			log.Printf("%v: got %v, want nil", o.Name, o.Err)
-		}
-		d, err := ioutil.ReadFile(o.Name)
 		if err != nil {
-			log.Printf("Error reading policy file found under %s, continuing", o.Name)
+			log.Printf("Error creating anonymous function for find, continue")
 			continue
 		}
-		// return when first policy file found
-		return d, nil
+		//spawn a goroutine
+		go f.Find()
+
+		// check if calling len(channel) is safe.
+		if len(f.Names) == 0 {
+			log.Printf("No policy file found under %s, continuing", searchPath)
+			continue
+		}
+
+		// Read in policy file:
+		for o := range f.Names {
+			if o.Err != nil {
+				log.Printf("%v: got %v, want nil", o.Name, o.Err)
+			}
+			d, err := ioutil.ReadFile(o.Name)
+			if err != nil {
+				log.Printf("Error reading policy file %s, continuing", o.Name)
+				continue
+			}
+			// return when first policy file found
+			return d, nil
+		}
+		log.Printf("Policy File not found under %s. Moving on to next search root.", searchPath)
 	}
-	return nil, fmt.Errorf("Unable to read any of the policy files under %s.Exiting scanBlockDevice() ", devicepath)
+	return nil, fmt.Errorf("No policy file found _OR_ if found, error reading them. Exiting scanBlockDevice() for %s", mountPath)
 }
 
 func locateSLPolicy() ([]byte, error) {
@@ -96,7 +112,8 @@ func locateSLPolicy() ([]byte, error) {
 		fmt.Println(val)
 		s := strings.Split(val, ":")
 		if len(s) != 2 {
-			log.Printf("incorrect format of sl_policy variable")
+			log.Printf("incorrect format of sl_policy cmd line parameter")
+			log.Printf("I will be nice. Instead of quiting on you. Will search block devices for you in case you put the file there")
 		} else {
 			deviceId := s[0]
 			devicePath := s[1]
@@ -119,47 +136,28 @@ func locateSLPolicy() ([]byte, error) {
 
 	log.Printf("Searching for securelaunch.policy on all block devices")
 	// FindDevices fn iterates over all local block devices and mounts them.
-	devices := diskboot.FindDevices("/sys/class/block/*")
-	if len(devices) == 0 {
+	blkDevices := diskboot.FindDevices("/sys/class/block/*")
+	if len(blkDevices) == 0 {
 		log.Printf("No block devices found. Scanning policy file elsewhere.")
-	} else {
-		log.Printf("Some block devices detected.")
-		for _, device := range devices {
-			devicepath := device.DevPath
-			log.Printf("Scanning for policy file under %s", devicepath)
-			// diskboot.FindDevice would return the /dev/foo path.
-			raw, err := scanBlockDevice(devicepath)
-			if e := mount.Unmount(devicepath, true, false); e != nil {
-				log.Printf("Unmount failed for %s. PANIC", devicepath)
-				panic(e)
-			}
-
-			if err != nil {
-				log.Printf("Policy File not found under %s. Moving on to next device.", devicepath)
-				continue
-			}
-			log.Printf("Policy File found under %s. Exiting locateSLPolicy()", devicepath)
-			return raw, nil
-		}
+		return nil, errors.New("No block devices found. where is policy file ?")
 	}
 
-	// scan for securelaunch.policy under /, /efi, or /boot
-	var SearchRoots = []string{
-		"/",
-		"/efi",
-		"/boot",
-	}
-	for _, c := range SearchRoots {
-		raw, err := scanBlockDevice(c)
-		if e := mount.Unmount(c, true, false); e != nil {
-			log.Printf("Unmount failed for %s. PANIC", c)
+	log.Printf("Some block devices detected.")
+	for _, device := range blkDevices {
+		devicePath := device.DevPath
+		mountPath := device.MountPath
+		log.Printf("Scanning for policy file under devicePath=%s, mountPath=%s", devicePath, mountPath)
+		raw, err := scanBlockDevice(mountPath)
+		if e := mount.Unmount(mountPath, true, false); e != nil {
+			log.Printf("Unmount failed for devicePath=%s mountPath=%s. PANIC", devicePath, mountPath)
 			panic(e)
 		}
-
 		if err != nil {
-			log.Printf("Policy File not found under %s. Moving on to next device.", c)
+			log.Printf("Policy File not found under devicePath=%s, mountPath=%s. Moving on to next device.", devicePath, mountPath)
 			continue
 		}
+
+		log.Printf("Policy File found under devicePath=%s, mountPath=%s. Exiting locateSLPolicy()", devicePath, mountPath)
 		return raw, nil
 	}
 
