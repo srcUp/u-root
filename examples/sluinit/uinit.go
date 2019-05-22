@@ -17,6 +17,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/TrenchBoot/tpmtool/pkg/tpm"
@@ -109,11 +110,11 @@ Iterate through each local block device,
 Read in policy file
 */
 func locateSLPolicy() ([]byte, error) {
-	log.Printf("Checking if sl_policy is set")
+	log.Printf("Checking if sl_policy cmdline param is set")
 	if val, ok := cmdline.Flag("sl_policy"); ok {
 		// format sl_policy=<block device identifier>:<path>
 		// e.g 1 sda:/boot/securelaunch.policy
-		// e.g 2 77d8da74-a690-481a-86d5-9beab5a8e842:/boot/securelaunch.policy
+		// TODO: e.g 2 77d8da74-a690-481a-86d5-9beab5a8e842:/boot/securelaunch.policy
 		// TODO: <block device identifier>:<mount options>,<path>
 		log.Printf("sl_policy flag is set with val=%s", val)
 		s := strings.Split(val, ":")
@@ -121,17 +122,18 @@ func locateSLPolicy() ([]byte, error) {
 			log.Printf("incorrect format of sl_policy cmd line parameter. correct format sl_policy=<block device identifier>:<path>")
 			log.Printf("I will be nice. Instead of quiting on you. Will search block devices for you in case you put the file there")
 		} else {
-			deviceId := s[0]
-			devicePath := filepath.Join("/dev", s[0]) // assumes s[0] is sda, devicePath=/dev/sda
-			// mount the first one and read the file.
-			dev := diskboot.FindDevice(devicePath) // mount the /dev/sda.
-			mountPath := dev.MountPath + s[1]      // mountPath will /tmp/slaunch.policy if /dev/sda mounted on /tmp
-			d, err := ioutil.ReadFile(mountPath)
+			devicePath := filepath.Join("/dev", s[0])   // assumes deviceId is sda, devicePath=/dev/sda
+			dev, err := diskboot.FindDevice(devicePath) // FindDevice fn mounts devicePath=/dev/sda.
 			if err != nil {
-				log.Printf("Error reading policy file found at mountPath=%s, devicePath=%s, passed=%s", mountPath, devicePath, val)
+				log.Printf("Error mounting devicePath=%s", devicePath)
 			} else {
-				// return when first policy file found
-				return d, nil
+				mountPath := dev.MountPath + s[1] // mountPath=/tmp/slaunch.policy if /dev/sda mounted on /tmp
+				d, err := ioutil.ReadFile(mountPath)
+				if err != nil {
+					log.Printf("Error reading policy file found at mountPath=%s, devicePath=%s, passed=%s", mountPath, devicePath, val)
+				} else {
+					return d, nil // return when first policy file found
+				}
 			}
 		}
 	}
