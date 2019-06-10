@@ -110,7 +110,7 @@ Iterate through each local block device,
 Read in policy file
 */
 func locateSLPolicy() ([]byte, error) {
-	log.Printf("Checking if sl_policy cmdline param is set")
+	log.Printf("Checking if sl_policy cmdline param is set yahoo")
 	if val, ok := cmdline.Flag("sl_policy"); ok {
 		// format sl_policy=<block device identifier>:<path>
 		// e.g 1 sda:/boot/securelaunch.policy
@@ -138,7 +138,18 @@ func locateSLPolicy() ([]byte, error) {
 		}
 	}
 
-	cmd := exec.Command("modprobe", "-S", "4.14.35-1838.el7uek.x86_64", "ata_generic")
+	cmd := exec.Command("/usr/sbin/depmod", "-a")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		log.Printf("err not nil from depmod: %s %v", string(out), err)
+	}
+
+	cmd = exec.Command("/usr/sbin/modprobe", "ahci")
+	// cmd := exec.Command("modprobe", "-S", "4.14.35-1838.el7uek.x86_64", "ata_generic")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		log.Printf("err not nil from modprobe: %s %v", string(out), err)
+	}
+
+	cmd = exec.Command("/usr/sbin/modprobe", "sd_mod")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		log.Printf("err not nil from modprobe: %s %v", string(out), err)
 	}
@@ -148,7 +159,7 @@ func locateSLPolicy() ([]byte, error) {
 	blkDevices := diskboot.FindDevices("/sys/class/block/*")
 	if len(blkDevices) == 0 {
 		log.Printf("No block devices found. Scanning policy file elsewhere.")
-		return nil, errors.New("No block devices found. where is policy file ?")
+		return nil, errors.New("No block devices found")
 	}
 
 	log.Printf("Some block devices detected.")

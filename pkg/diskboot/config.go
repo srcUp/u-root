@@ -135,6 +135,7 @@ func FindConfigs(mountPath string) []*Config {
 		configPath := filepath.Join(mountPath, location.Path)
 		contents, err := ioutil.ReadFile(configPath)
 		if err != nil {
+			fmt.Printf("error in reading configPath=%v\n", configPath)
 			// TODO: log error
 			continue
 		}
@@ -149,6 +150,7 @@ func FindConfigs(mountPath string) []*Config {
 		configs = append(configs, ParseConfig(mountPath, configPath, lines))
 	}
 
+	fmt.Printf("configs=%v\n", configs)
 	return configs
 }
 
