@@ -29,9 +29,8 @@ func fstypes() (fstypes []string, err error) {
 		return nil, fmt.Errorf("Failed to read /proc/filesystems: %v", err)
 	}
 
-	fmt.Printf("read bytes from /proc/filesystems= %v\n", bytes)
+	// fmt.Printf("read bytes from /proc/filesystems= %v\n", bytes)
 	for _, line := range strings.Split(string(bytes), "\n") {
-		fmt.Printf("line= %v, fields=%v\n", line, len(strings.Fields(line)))
 		if fields := strings.Fields(line); len(fields) == 1 {
 			fstypes = append(fstypes, fields[0])
 		}
@@ -70,7 +69,6 @@ func FindDevices(devicesGlob string) (devices []*Device) {
 		}
 	}
 
-	fmt.Printf("returning\n")
 	return devices
 }
 
@@ -100,7 +98,7 @@ func mountDevice(devPath string, fstypes []string) (*Device, error) {
 		fmt.Printf("Caling FindConfigs\n")
 		configs := FindConfigs(mountPath)
 		if len(configs) == 0 {
-			fmt.Printf("no configs found\n")
+			fmt.Printf("\nno configs found\n")
 			continue
 		}
 
