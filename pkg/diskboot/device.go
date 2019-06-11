@@ -34,8 +34,6 @@ func fstypes() (fstypes []string, err error) {
 		fmt.Printf("line= %v, fields=%v\n", line, len(strings.Fields(line)))
 		if fields := strings.Fields(line); len(fields) == 1 {
 			fstypes = append(fstypes, fields[0])
-		} else if len(fields) == 2 {
-			fstypes = append(fstypes, fields[1])
 		}
 	}
 	return fstypes, nil
@@ -45,12 +43,12 @@ func fstypes() (fstypes []string, err error) {
 func FindDevices(devicesGlob string) (devices []*Device) {
 	fstypes, err := fstypes()
 	if err != nil {
-		fmt.Printf("I got these fstypes %v\n", fstypes)
+		fmt.Printf("I got err in calling fstypes %v\n", err)
 		return nil
 	}
 
 	// What if no 0 fstypes are found ?
-	fmt.Printf("I got %v fstypes\n", len(fstypes))
+	fmt.Printf("I got %v fstypes= %v\n", len(fstypes), fstypes)
 
 	sysList, err := filepath.Glob(devicesGlob)
 	if err != nil {
@@ -61,6 +59,7 @@ func FindDevices(devicesGlob string) (devices []*Device) {
 	// The Linux /sys file system is a bit, er, awkward. You can't find
 	// the device special in there; just everything else.
 	for _, sys := range sysList {
+		fmt.Println()
 		fmt.Printf("sys=%v\n", sys)
 		blk := filepath.Join("/dev", filepath.Base(sys))
 
@@ -99,15 +98,14 @@ func mountDevice(devPath string, fstypes []string) (*Device, error) {
 
 		fmt.Printf("Succeeded in mount %v, %v, %v\n", devPath, mountPath, fstype)
 		fmt.Printf("Caling FindConfigs\n")
-		//configs := FindConfigs(mountPath)
-		//if len(configs) == 0 {
-		//	fmt.Printf("no configs found\n")
-		//	continue
-		//}
+		configs := FindConfigs(mountPath)
+		if len(configs) == 0 {
+			fmt.Printf("no configs found\n")
+			continue
+		}
 
-		return &Device{devPath, mountPath, fstype, nil}, nil
-		// return &Device{devPath, mountPath, fstype, configs}, nil
+		return &Device{devPath, mountPath, fstype, configs}, nil
 	}
-	fmt.Printf("len(fstypes)=%v\n", len(fstypes))
+	// fmt.Printf("len(fstypes)=%v\n", len(fstypes))
 	return nil, fmt.Errorf("Failed to find a valid boot device with configs")
 }

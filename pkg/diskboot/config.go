@@ -121,6 +121,7 @@ var (
 		{"boot/syslinux/syslinux.cfg", syslinux},
 		{"syslinux/syslinux.cfg", syslinux},
 		{"syslinux.cfg", syslinux},
+		{"securelaunch.policy", syslinux},
 	}
 )
 

@@ -74,14 +74,8 @@ func scanBlockDevice(mountPath string) ([]byte, error) {
 			log.Printf("Error creating anonymous function for find, continue")
 			continue
 		}
-		//spawn a goroutine
+		// spawn a goroutine
 		go f.Find()
-
-		// check if calling len(channel) is safe.
-		if len(f.Names) == 0 {
-			log.Printf("No policy file found under %s, continuing", searchPath)
-			continue
-		}
 
 		// Read in policy file:
 		for o := range f.Names {
@@ -143,15 +137,13 @@ func locateSLPolicy() ([]byte, error) {
 		log.Printf("err not nil from depmod: %s %v", string(out), err)
 	}
 
-	cmd = exec.Command("/usr/sbin/modprobe", "ahci")
-	// cmd := exec.Command("modprobe", "-S", "4.14.35-1838.el7uek.x86_64", "ata_generic")
-	if out, err := cmd.CombinedOutput(); err != nil {
-		log.Printf("err not nil from modprobe: %s %v", string(out), err)
-	}
-
-	cmd = exec.Command("/usr/sbin/modprobe", "sd_mod")
-	if out, err := cmd.CombinedOutput(); err != nil {
-		log.Printf("err not nil from modprobe: %s %v", string(out), err)
+	modules := []string{"ahci", "sd_mod", "ext4"}
+	for _, module := range modules {
+		cmd = exec.Command("/usr/sbin/modprobe", module)
+		// cmd := exec.Command("modprobe", "-S", "4.14.35-1838.el7uek.x86_64", "ata_generic")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			log.Printf("err not nil from modprobe: %s %v", string(out), err)
+		}
 	}
 
 	log.Printf("Searching for securelaunch.policy on all block devices")
@@ -172,6 +164,7 @@ func locateSLPolicy() ([]byte, error) {
 			log.Printf("Unmount failed for devicePath=%s mountPath=%s. PANIC", devicePath, mountPath)
 			panic(e)
 		}
+
 		if err != nil {
 			log.Printf("Policy File not found under devicePath=%s, mountPath=%s. Moving on to next device.", devicePath, mountPath)
 			continue
