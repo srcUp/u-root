@@ -34,6 +34,8 @@ func fstypes() (fstypes []string, err error) {
 		fmt.Printf("line= %v, fields=%v\n", line, len(strings.Fields(line)))
 		if fields := strings.Fields(line); len(fields) == 1 {
 			fstypes = append(fstypes, fields[0])
+		} else if len(fields) == 2 {
+			fstypes = append(fstypes, fields[1])
 		}
 	}
 	return fstypes, nil
@@ -95,14 +97,16 @@ func mountDevice(devPath string, fstypes []string) (*Device, error) {
 			continue
 		}
 
+		fmt.Printf("Succeeded in mount %v, %v, %v\n", devPath, mountPath, fstype)
 		fmt.Printf("Caling FindConfigs\n")
-		configs := FindConfigs(mountPath)
-		if len(configs) == 0 {
-			fmt.Printf("no configs found\n")
-			continue
-		}
+		//configs := FindConfigs(mountPath)
+		//if len(configs) == 0 {
+		//	fmt.Printf("no configs found\n")
+		//	continue
+		//}
 
-		return &Device{devPath, mountPath, fstype, configs}, nil
+		return &Device{devPath, mountPath, fstype, nil}, nil
+		// return &Device{devPath, mountPath, fstype, configs}, nil
 	}
 	fmt.Printf("len(fstypes)=%v\n", len(fstypes))
 	return nil, fmt.Errorf("Failed to find a valid boot device with configs")
