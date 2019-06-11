@@ -121,7 +121,6 @@ var (
 		{"boot/syslinux/syslinux.cfg", syslinux},
 		{"syslinux/syslinux.cfg", syslinux},
 		{"syslinux.cfg", syslinux},
-		{"securelaunch.policy", syslinux},
 	}
 )
 
@@ -136,7 +135,6 @@ func FindConfigs(mountPath string) []*Config {
 		configPath := filepath.Join(mountPath, location.Path)
 		contents, err := ioutil.ReadFile(configPath)
 		if err != nil {
-			// fmt.Printf("err=%v\n", err)
 			// TODO: log error
 			continue
 		}
@@ -151,7 +149,6 @@ func FindConfigs(mountPath string) []*Config {
 		configs = append(configs, ParseConfig(mountPath, configPath, lines))
 	}
 
-	fmt.Printf("configs=%v\n", configs)
 	return configs
 }
 

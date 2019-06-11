@@ -54,9 +54,11 @@ type policy struct {
  	TODO: e.g 2 77d8da74-a690-481a-86d5-9beab5a8e842:/boot/securelaunch.policy
 	TODO: <block device identifier>:<mount options>,<path> */
 func scanKernelCmdLine() ([]byte, error) {
-	log.Printf("Checking if sl_policy cmdline param is set")
+
+	log.Printf("Scanning kernel cmd line for *sl_policy* flag")
 	val, ok := cmdline.Flag("sl_policy")
 	if !ok {
+		log.Printf("sl_policy cmdline flag is not set")
 		return nil, errors.New("Flag Not Set")
 	}
 
@@ -90,6 +92,7 @@ func scanKernelCmdLine() ([]byte, error) {
  	and searchPath would be /tmp/sda1/, /tmp/sda1/efi, and /tmp/sda1/boot
 		respectively for each iteration of loop over SearchRoots slice. */
 func scanBlockDevice(mountPath string) ([]byte, bool) {
+
 	// scan for securelaunch.policy under /, /efi, or /boot
 	var SearchRoots = []string{"/", "/efi", "/boot"}
 	for _, c := range SearchRoots {
@@ -131,16 +134,16 @@ Read in policy file */
 func locateSLPolicy() ([]byte, error) {
 
 	d, err := scanKernelCmdLine()
-	if err == nil || err.Error() != "FlagNotSet" {
-		return d, nil
+	if err == nil || err.Error() != "Flag Not Set" {
+		return d, err
 	}
 
+	log.Printf("Searching and mounting block devices with bootable configs")
 	blkDevices := diskboot.FindDevices("/sys/class/block/*") // FindDevices find and *mounts* the devices.
 	if len(blkDevices) == 0 {
 		return nil, errors.New("No block devices found")
 	}
 
-	log.Printf("%v block devices detected", len(blkDevices))
 	for _, device := range blkDevices {
 		devicePath, mountPath := device.DevPath, device.MountPath
 		log.Printf("scanning for policy file under devicePath=%s, mountPath=%s\n", devicePath, mountPath)
@@ -155,7 +158,7 @@ func locateSLPolicy() ([]byte, error) {
 			continue
 		}
 
-		log.Printf("policy File Found.\n")
+		log.Printf("policy file found.\n")
 		return raw, nil
 	}
 
@@ -225,7 +228,8 @@ func main() {
 
 // populate required modules here
 func init() {
-	// depmod is executed once while modprobe three times
+	/* depmod is executed once while modprobe three times
+	ahci, sd_mod for block device detection, ext4 for fstypes() function */
 	cmds := map[string][]string{
 		"/usr/sbin/depmod":   {"-a"},
 		"/usr/sbin/modprobe": {"ahci", "sd_mod", "ext4"},
