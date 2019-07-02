@@ -1,6 +1,7 @@
 package measurement
 
 import (
+	"errors"
 	"github.com/TrenchBoot/tpmtool/pkg/tpm"
 )
 
@@ -40,12 +41,12 @@ type DmiCollector struct {
 }
 
 func NewDmiCollector(config []byte) (Collector, error) {
-	a := new(DmiCollector)
-	var b error
-	return a, b
+	return new(DmiCollector), nil
 }
 
 func (s *DmiCollector) Collect(t *tpm.TPM) error {
-	var a error
-	return a
+	if s.Type != "dmi" {
+		return errors.New("Invalid type passed to a DmiCollector method")
+	}
+	return nil
 }

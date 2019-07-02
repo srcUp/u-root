@@ -209,7 +209,7 @@ func main() {
 		//need to decide how to bail, reboot, error msg & halt, or
 		//recovery shell
 	}
-	return
+
 	// The policy file must be measured and extended into PCR21 (PCR15
 	// until DRTM launch is working and able to set locality
 
