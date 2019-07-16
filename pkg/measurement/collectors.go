@@ -11,6 +11,10 @@ type Collector interface {
 	Collect(t *tpm.TPM) error
 }
 
+const (
+	pcrIndex uint32 = 23
+)
+
 var supportedCollectors = map[string]func([]byte) (Collector, error){
 	"storage": NewStorageCollector,
 	"dmi":     NewDmiCollector,

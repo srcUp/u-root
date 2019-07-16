@@ -2,6 +2,7 @@ package measurement
 
 import (
 	"github.com/TrenchBoot/tpmtool/pkg/tpm"
+	"log"
 )
 
 type StorageCollector struct {
@@ -16,6 +17,14 @@ func NewStorageCollector(config []byte) (Collector, error) {
 }
 
 func (s *StorageCollector) Collect(t *tpm.TPM) error {
-	var a error
-	return a
+
+	for _, blkDevicePath := range s.Paths {
+		log.Printf("Measuring content in block device Path=%s\n", blkDevicePath)
+		err := MeasureInputFile(t, blkDevicePath+":/")
+		if err != nil {
+			log.Printf("MeasureInputVal err = %v", err)
+		}
+	}
+
+	return nil
 }
