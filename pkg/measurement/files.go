@@ -1,8 +1,6 @@
-package main
+package measurement
 
 import (
-	"encoding/json"
-
 	"github.com/TrenchBoot/tpmtool/pkg/tpm"
 )
 
@@ -12,7 +10,9 @@ type FileCollector struct {
 }
 
 func NewFileCollector(config []byte) (Collector, error) {
+	return new(FileCollector), nil
 }
 
 func (s *FileCollector) Collect(t *tpm.TPM) error {
+	return nil
 }

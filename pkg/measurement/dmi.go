@@ -1,11 +1,7 @@
-package main
+package measurement
 
 import (
-	"encoding/json"
-
 	"github.com/TrenchBoot/tpmtool/pkg/tpm"
-	"github.com/digitalocean/go-smbios"
-	"github.com/ugorji/go/codec"
 )
 
 // DMI Events are expected to be a COMBINED_EVENT extend, as such the json
@@ -39,12 +35,14 @@ type fieldCluster struct {
 }
 
 type DmiCollector struct {
-	Type     string `json:"type"`
-	Clusters []fieldCluster
+	Type     string         `json:"type"`
+	Clusters []fieldCluster `json:"events"`
 }
 
 func NewDmiCollector(config []byte) (Collector, error) {
+	return new(DmiCollector), nil
 }
 
 func (s *DmiCollector) Collect(t *tpm.TPM) error {
+	return nil
 }
