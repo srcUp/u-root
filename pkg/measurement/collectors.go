@@ -8,7 +8,7 @@ import (
 )
 
 type Collector interface {
-	Collect(t *tpm.TPM) error
+	Collect(t tpm.TPM) error
 }
 
 const (

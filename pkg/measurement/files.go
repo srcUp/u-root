@@ -1,6 +1,7 @@
 package measurement
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/TrenchBoot/tpmtool/pkg/tpm"
 	"github.com/u-root/u-root/pkg/diskboot"
@@ -16,15 +17,18 @@ type FileCollector struct {
 }
 
 func NewFileCollector(config []byte) (Collector, error) {
-	a := new(FileCollector)
-	var b error
-	return a, b
+	var fc = new(FileCollector)
+	err := json.Unmarshal(config, &fc)
+	if err != nil {
+		return nil, err
+	}
+	return fc, nil
 }
 
 // measures file input by user in policy file and store in TPM.
 // inputVal is of format <block device identifier>:<path>
 // Example sda:/path/to/file
-func MeasureInputFile(t *tpm.TPM, inputVal string) error {
+func MeasureInputFile(t tpm.TPM, inputVal string) error {
 	s := strings.Split(inputVal, ":")
 	if len(s) != 2 {
 		return fmt.Errorf("%v: incorrect format. Usage: <block device identifier>:<path>", inputVal)
@@ -47,7 +51,7 @@ func MeasureInputFile(t *tpm.TPM, inputVal string) error {
 	return nil
 }
 
-func (s *FileCollector) Collect(t *tpm.TPM) error {
+func (s *FileCollector) Collect(t tpm.TPM) error {
 
 	for _, inputVal := range s.Paths {
 		err := MeasureInputFile(t, inputVal)

@@ -1,6 +1,7 @@
 package measurement
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/TrenchBoot/tpmtool/pkg/tpm"
@@ -43,7 +44,12 @@ type DmiCollector struct {
 }
 
 func NewDmiCollector(config []byte) (Collector, error) {
-	return new(DmiCollector), nil
+	var dc = new(DmiCollector)
+	err := json.Unmarshal(config, &dc)
+	if err != nil {
+		return nil, err
+	}
+	return dc, nil
 }
 
 // below table is from man dmidecode
@@ -95,13 +101,13 @@ var type_table = map[string]uint8{
 	"Onboard Device":                   41,
 }
 
-func (s *DmiCollector) Collect(t *tpm.TPM) error {
+func (s *DmiCollector) Collect(t tpm.TPM) error {
 	if s.Type != "dmi" {
 		return errors.New("Invalid type passed to a DmiCollector method")
 	}
 
 	// Find SMBIOS data in operating system-specific location.
-	rc, ep, err := smbios.Stream()
+	rc, _, err := smbios.Stream()
 	if err != nil {
 		return fmt.Errorf("failed to open stream: %v", err)
 	}
@@ -129,10 +135,11 @@ func (s *DmiCollector) Collect(t *tpm.TPM) error {
 			}
 
 			fmt.Printf("Hashing %s information\n", label)
+			fmt.Printf("Storing %s\n", k.Formatted)
 			// TODO: Measure specific parts of s structure on user's request.
 			// For example: for BIOS type(type=0), currently we measure entire output
 			// but in future we could measure individual parts like bios-vendor, bios-version etc.
-			t.Measure(pcrIndex, k) // keep extending same pcr .
+			t.Measure(pcrIndex, k.Formatted) // keep extending same pcr .
 		}
 	}
 

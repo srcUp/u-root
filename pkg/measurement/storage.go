@@ -1,6 +1,7 @@
 package measurement
 
 import (
+	"encoding/json"
 	"github.com/TrenchBoot/tpmtool/pkg/tpm"
 	"log"
 )
@@ -11,12 +12,15 @@ type StorageCollector struct {
 }
 
 func NewStorageCollector(config []byte) (Collector, error) {
-	a := new(StorageCollector)
-	var b error
-	return a, b
+	var sc = new(StorageCollector)
+	err := json.Unmarshal(config, &sc)
+	if err != nil {
+		return nil, err
+	}
+	return sc, nil
 }
 
-func (s *StorageCollector) Collect(t *tpm.TPM) error {
+func (s *StorageCollector) Collect(t tpm.TPM) error {
 
 	for _, blkDevicePath := range s.Paths {
 		log.Printf("Measuring content in block device Path=%s\n", blkDevicePath)
