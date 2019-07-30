@@ -27,10 +27,12 @@ func GetCollector(config []byte) (Collector, error) {
 	}
 	err := json.Unmarshal(config, &header)
 	if err != nil {
+		fmt.Printf("Unmarshal errir in measurement pkg\n")
 		return nil, err
 	}
 
 	if init, ok := supportedCollectors[header.Type]; ok {
+		fmt.Printf("init=%v\n", init)
 		return init(config)
 	}
 

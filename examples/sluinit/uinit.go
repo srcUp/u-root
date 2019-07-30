@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/TrenchBoot/tpmtool/pkg/tpm"
 	"github.com/u-root/u-root/pkg/cmdline"
 	"github.com/u-root/u-root/pkg/diskboot"
 	"github.com/u-root/u-root/pkg/find"
@@ -19,8 +20,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-
-	"github.com/TrenchBoot/tpmtool/pkg/tpm"
 )
 
 type launcher struct {
@@ -75,10 +74,11 @@ func scanKernelCmdLine() ([]byte, error) {
 	}
 
 	mountPath := dev.MountPath + s[1] // mountPath=/tmp/slaunch.policy if /dev/sda mounted on /tmp
+	log.Printf("Reading file=%s", mountPath)
 	d, err := ioutil.ReadFile(mountPath)
 	if err != nil {
 		// - TODO: should we check for end of file ?
-		return nil, fmt.Errorf("Error reading policy file found at mountPath=%s, devicePath=%s, passed=%s", mountPath, devicePath, val)
+		return nil, fmt.Errorf("Error reading policy file found at mountPath=%s, devicePath=%s, passed=%s\n", mountPath, devicePath, val)
 	}
 	return d, nil
 }
@@ -93,6 +93,7 @@ func scanKernelCmdLine() ([]byte, error) {
 		respectively for each iteration of loop over SearchRoots slice. */
 func scanBlockDevice(mountPath string) ([]byte, bool) {
 
+	log.Printf("scanBlockDevice\n")
 	// scan for securelaunch.policy under /, /efi, or /boot
 	var SearchRoots = []string{"/", "/efi", "/boot"}
 	for _, c := range SearchRoots {
@@ -138,7 +139,7 @@ func locateSLPolicy() ([]byte, error) {
 		return d, err
 	}
 
-	log.Printf("Searching and mounting block devices with bootable configs")
+	log.Printf("Searching and mounting block devices with bootable configs\n")
 	blkDevices := diskboot.FindDevices("/sys/class/block/*") // FindDevices find and *mounts* the devices.
 	if len(blkDevices) == 0 {
 		return nil, errors.New("No block devices found")
@@ -149,12 +150,12 @@ func locateSLPolicy() ([]byte, error) {
 		log.Printf("scanning for policy file under devicePath=%s, mountPath=%s\n", devicePath, mountPath)
 		raw, found := scanBlockDevice(mountPath)
 		if e := mount.Unmount(mountPath, true, false); e != nil {
-			log.Printf("Unmount failed. PANIC")
+			log.Printf("Unmount failed. PANIC\n")
 			panic(e)
 		}
 
 		if !found {
-			log.Printf("no policy file found under this device")
+			log.Printf("no policy file found under this device\n")
 			continue
 		}
 
@@ -175,6 +176,7 @@ func parseSLPolicy(pf []byte) (*policy, error) {
 	}
 
 	if err := json.Unmarshal(pf, &parse); err != nil {
+		log.Printf("parseSLPolicy: Unmarshall error for entire policy file!! err=%v\n", err)
 		return nil, err
 	}
 
@@ -183,13 +185,16 @@ func parseSLPolicy(pf []byte) (*policy, error) {
 	for _, c := range parse.Collectors {
 		collector, err := measurement.GetCollector(c)
 		if err != nil {
+			log.Printf("getCollector failed for c=%s, collector=%v\n", c, collector)
 			return nil, err
 		}
 		p.Collectors = append(p.Collectors, collector)
 	}
 
+	log.Printf("len(parse.Launcher)=%d, parse.Launcher=%s\n", len(parse.Launcher), parse.Launcher)
 	if len(parse.Launcher) > 0 {
 		if err := json.Unmarshal(parse.Launcher, &p.Launcher); err != nil {
+			log.Printf("parseSLPolicy: Launcher Unmarshall error=%v!!\n", err)
 			return nil, err
 		}
 	}
@@ -205,11 +210,12 @@ func main() {
 
 	rawBytes, err := locateSLPolicy()
 	if err != nil {
-		log.Printf("locateSLPolicy failed: err=%v", err)
+		log.Printf("locateSLPolicy failed: err=%v\n", err)
 		//need to decide how to bail, reboot, error msg & halt, or
 		//recovery shell
 	}
 
+	log.Printf("policy file located\n")
 	// The policy file must be measured and extended into PCR21 (PCR15
 	// until DRTM launch is working and able to set locality
 
@@ -217,10 +223,19 @@ func main() {
 	if err != nil {
 		//need to decide how to bail, reboot, error msg & halt, or
 		//recovery shell
+		log.Printf("parseSLPolicy failed \n")
+		return
 	}
 
+	if p == nil {
+		log.Printf("SL Policy parsed into a null set\n")
+		return
+	}
+
+	log.Printf("policy file parsed=%v\n", p)
 	for _, c := range p.Collectors {
-		c.Collect(&tpm)
+		fmt.Printf("%v\n", c)
+		c.Collect(tpm)
 	}
 
 	p.Launcher.Boot()
@@ -238,9 +253,9 @@ func init() {
 	for cmd_path, options := range cmds {
 		for _, option := range options {
 			cmd := exec.Command(cmd_path, option)
-			log.Printf("running command : %v %v: and waiting for it to finish...", cmd_path, option)
+			log.Printf("running command : %v %v: and waiting for it to finish...\n", cmd_path, option)
 			if err := cmd.Run(); err != nil {
-				log.Printf("command finished with error: %v", err)
+				log.Printf("command finished with error: %v\n", err)
 				os.Exit(1)
 			}
 			log.Printf("..... Done\n")

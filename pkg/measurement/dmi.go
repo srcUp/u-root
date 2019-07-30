@@ -44,9 +44,11 @@ type DmiCollector struct {
 }
 
 func NewDmiCollector(config []byte) (Collector, error) {
+	fmt.Printf("New DMI Collector\n")
 	var dc = new(DmiCollector)
 	err := json.Unmarshal(config, &dc)
 	if err != nil {
+		fmt.Printf("Unmarshall error\n")
 		return nil, err
 	}
 	return dc, nil
@@ -102,19 +104,23 @@ var type_table = map[string]uint8{
 }
 
 func (s *DmiCollector) Collect(t tpm.TPM) error {
+	fmt.Printf("Collecting DMI information\n")
 	if s.Type != "dmi" {
 		return errors.New("Invalid type passed to a DmiCollector method")
 	}
 
+	fmt.Printf("2- Collecting DMI information\n")
 	// Find SMBIOS data in operating system-specific location.
 	rc, _, err := smbios.Stream()
 	if err != nil {
 		return fmt.Errorf("failed to open stream: %v", err)
 	}
 
+	fmt.Printf("3-Collecting DMI information\n")
 	// Be sure to close the stream!
 	defer rc.Close()
 
+	fmt.Printf("4-Collecting DMI information\n")
 	// Decode SMBIOS structures from the stream.
 	d := smbios.NewDecoder(rc)
 	data, err := d.Decode()
@@ -127,6 +133,7 @@ func (s *DmiCollector) Collect(t tpm.TPM) error {
 		labels = append(labels, fieldCluster.Label)
 	}
 
+	fmt.Printf("5-Collecting DMI information\n")
 	for _, k := range data { // k ==> data for each dmi type
 		// Only look at types mentioned in policy file.
 		for _, label := range labels {

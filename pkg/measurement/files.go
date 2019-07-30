@@ -17,6 +17,7 @@ type FileCollector struct {
 }
 
 func NewFileCollector(config []byte) (Collector, error) {
+	fmt.Printf("New Files Collector\n")
 	var fc = new(FileCollector)
 	err := json.Unmarshal(config, &fc)
 	if err != nil {
