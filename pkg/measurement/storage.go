@@ -20,7 +20,7 @@ func NewStorageCollector(config []byte) (Collector, error) {
 	return sc, nil
 }
 
-func (s *StorageCollector) Collect(t tpm.TPM) error {
+func (s *StorageCollector) Collect(t *tpm.TPM) error {
 
 	for _, blkDevicePath := range s.Paths {
 		log.Printf("Measuring content in block device Path=%s\n", blkDevicePath)

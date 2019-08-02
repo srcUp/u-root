@@ -205,7 +205,9 @@ func parseSLPolicy(pf []byte) (*policy, error) {
 func main() {
 	log.Printf("init completed. starting main ......\n")
 	tpm, err := tpm.NewTPM()
-
+	if err != nil {
+		log.Printf("Couldn't talk to TPM Device: err=%v\n", err)
+	}
 	// Request TPM locality 2, requires extending go-tpm for locality request
 
 	rawBytes, err := locateSLPolicy()
@@ -218,7 +220,6 @@ func main() {
 	log.Printf("policy file located\n")
 	// The policy file must be measured and extended into PCR21 (PCR15
 	// until DRTM launch is working and able to set locality
-
 	p, err := parseSLPolicy(rawBytes)
 	if err != nil {
 		//need to decide how to bail, reboot, error msg & halt, or
@@ -235,7 +236,7 @@ func main() {
 	log.Printf("policy file parsed=%v\n", p)
 	for _, c := range p.Collectors {
 		fmt.Printf("%v\n", c)
-		c.Collect(tpm)
+		c.Collect(&tpm)
 	}
 
 	p.Launcher.Boot()

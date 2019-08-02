@@ -29,7 +29,7 @@ func NewFileCollector(config []byte) (Collector, error) {
 // measures file input by user in policy file and store in TPM.
 // inputVal is of format <block device identifier>:<path>
 // Example sda:/path/to/file
-func MeasureInputFile(t tpm.TPM, inputVal string) error {
+func MeasureInputFile(t *tpm.TPM, inputVal string) error {
 	s := strings.Split(inputVal, ":")
 	if len(s) != 2 {
 		return fmt.Errorf("%v: incorrect format. Usage: <block device identifier>:<path>", inputVal)
@@ -42,17 +42,18 @@ func MeasureInputFile(t tpm.TPM, inputVal string) error {
 	}
 
 	mountPath := dev.MountPath + s[1] // mountPath=/tmp/path/to/target/file if /dev/sda mounted on /tmp
-	d, err := ioutil.ReadFile(mountPath)
+	// d, err := ioutil.ReadFile(mountPath)
+	_, err = ioutil.ReadFile(mountPath)
 	if err != nil {
 		// - TODO: should we check for end of file ?
 		return fmt.Errorf("Error reading target file found at mountPath=%s, devicePath=%s, passed=%s",
 			mountPath, devicePath, inputVal)
 	}
-	t.Measure(pcrIndex, d)
+	// t.Measure(pcrIndex, d)
 	return nil
 }
 
-func (s *FileCollector) Collect(t tpm.TPM) error {
+func (s *FileCollector) Collect(t *tpm.TPM) error {
 
 	for _, inputVal := range s.Paths {
 		err := MeasureInputFile(t, inputVal)
