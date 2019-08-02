@@ -141,25 +141,17 @@ func (s *DmiCollector) Collect(t *tpm.TPM) error {
 			fmt.Printf("Hashing %s information\n", label)
 			b := new(bytes.Buffer)
 			for _, str := range k.Strings {
-				fmt.Printf("Storing %s\n", str)
+				// fmt.Printf("Storing %s\n", str)
 				b.WriteString(str)
 			}
 
-			//fmt.Println(b.Len())
-			//fmt.Println(b.String())
-			//ans := b.Bytes()
-			//fmt.Println(ans)
-
-			//c := new(bytes.Buffer)
-			//c.WriteString("Simran")
-			fmt.Printf("%T\n", t)
-			fmt.Printf("%T\n", *t)
 			// fmt.Printf("%T\n", t)
+			// fmt.Printf("%T\n", *t)
 			// TODO: Measure specific parts of s structure on user's request.
 			// For example: for BIOS type(type=0), currently we measure entire output
 			// but in future we could measure individual parts like bios-vendor, bios-version etc.
-			fmt.Println((*t).Version())
-			// t.Measure(pcrIndex, []byte("Simran"))
+			fmt.Println("Measuring into TPM " + (*t).Version())
+			(*t).Measure(pcrIndex, b.Bytes())
 		}
 	}
 
