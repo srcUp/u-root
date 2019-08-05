@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/TrenchBoot/tpmtool/pkg/tpm"
 	"github.com/u-root/u-root/pkg/diskboot"
+	"github.com/u-root/u-root/pkg/mount"
 	"io"
 	"log"
 	"os"
@@ -22,6 +23,7 @@ type StorageCollector struct {
 }
 
 func NewStorageCollector(config []byte) (Collector, error) {
+	log.Printf("New Storage Collector initialized\n")
 	var sc = new(StorageCollector)
 	err := json.Unmarshal(config, &sc)
 	if err != nil {
@@ -60,21 +62,39 @@ func ReadDisk(mountPath string) (byteCount int, buffer *bytes.Buffer) {
 	return
 }
 
+/* - mount block device
+ * - Read block device in chunks into a buffer
+ * - Unmount block device
+ * - Measure buffer and store in TPM.
+ */
+func MeasureStorageDevice(t *tpm.TPM, blkDevicePath string) error {
+	log.Printf("Storage Collector: Measuring block device %s\n", blkDevicePath)
+	dev, err := diskboot.FindDevice(blkDevicePath) // FindDevice fn mounts devicePath=/dev/sda.
+	if err != nil {
+		return err
+	}
+
+	buflen, buf := ReadDisk(dev.MountPath)
+	if e := mount.Unmount(dev.MountPath, true, false); e != nil {
+		log.Printf("Storage Collector: Unmount failed. PANIC\n")
+		panic(e)
+	}
+
+	if buflen == 0 {
+		return fmt.Errorf("Empty Disk %s Nothing to measure.\n", blkDevicePath)
+	}
+
+	return (*t).Measure(pcrIndex, buf.Bytes())
+}
+
 func (s *StorageCollector) Collect(t *tpm.TPM) error {
 
-	for _, blkDevicePath := range s.Paths {
-		log.Printf("Measuring content in block device Path=%s\n", blkDevicePath)
-
-		dev, err := diskboot.FindDevice(blkDevicePath) // FindDevice fn mounts devicePath=/dev/sda.
+	for _, inputVal := range s.Paths {
+		err := MeasureStorageDevice(t, inputVal) // inputVal is blkDevicePath e.g /dev/sda
 		if err != nil {
+			log.Printf("Storage Collector: input = %s, err = %v", inputVal, err)
 			return err
 		}
-
-		buflen, buf := ReadDisk(dev.MountPath)
-		if buflen == 0 {
-			return fmt.Errorf("Empty Disk %s Nothing to measure.\n", blkDevicePath)
-		}
-		(*t).Measure(pcrIndex, buf.Bytes())
 	}
 
 	return nil

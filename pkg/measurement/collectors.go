@@ -32,7 +32,6 @@ func GetCollector(config []byte) (Collector, error) {
 	}
 
 	if init, ok := supportedCollectors[header.Type]; ok {
-		fmt.Printf("init=%v\n", init)
 		return init(config)
 	}
 

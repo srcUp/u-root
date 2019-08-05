@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/TrenchBoot/tpmtool/pkg/tpm"
 	"github.com/digitalocean/go-smbios/smbios"
+	"log"
 )
 
 // DMI Events are expected to be a COMBINED_EVENT extend, as such the json
@@ -45,11 +46,10 @@ type DmiCollector struct {
 }
 
 func NewDmiCollector(config []byte) (Collector, error) {
-	fmt.Printf("New DMI Collector\n")
+	log.Printf("New DMI Collector initialized\n")
 	var dc = new(DmiCollector)
 	err := json.Unmarshal(config, &dc)
 	if err != nil {
-		fmt.Printf("Unmarshall error\n")
 		return nil, err
 	}
 	return dc, nil
@@ -105,7 +105,7 @@ var type_table = map[string]uint8{
 }
 
 func (s *DmiCollector) Collect(t *tpm.TPM) error {
-	fmt.Printf("Collecting DMI information\n")
+	log.Printf("DMI Collector: Entering \n")
 	if s.Type != "dmi" {
 		return errors.New("Invalid type passed to a DmiCollector method")
 	}
@@ -138,20 +138,20 @@ func (s *DmiCollector) Collect(t *tpm.TPM) error {
 				continue
 			}
 
-			fmt.Printf("Hashing %s information\n", label)
+			log.Printf("DMI Collector: Hashing %s information\n", label)
 			b := new(bytes.Buffer)
 			for _, str := range k.Strings {
-				// fmt.Printf("Storing %s\n", str)
+				// log.Printf("Storing %s\n", str)
 				b.WriteString(str)
 			}
 
-			// fmt.Printf("%T\n", t)
-			// fmt.Printf("%T\n", *t)
-			// TODO: Measure specific parts of s structure on user's request.
+			// log.Printf("%T", *t)
+			// TODO: Extract and Measure specific "Fields" of a FieldCluster on user's request.
 			// For example: for BIOS type(type=0), currently we measure entire output
-			// but in future we could measure individual parts like bios-vendor, bios-version etc.
-			fmt.Println("Measuring into TPM " + (*t).Version())
-			(*t).Measure(pcrIndex, b.Bytes())
+			// but in future we could measure individual fields like bios-vendor, bios-version etc.
+			if e := (*t).Measure(pcrIndex, b.Bytes()); e != nil {
+				return e
+			}
 		}
 	}
 

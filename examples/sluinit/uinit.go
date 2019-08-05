@@ -45,6 +45,8 @@ type policy struct {
 	DefaultAction string
 	Collectors    []measurement.Collector
 	Launcher      launcher
+	kernel        string
+	initrd        string
 }
 
 /* 	scanKernelCmdLine() ([]byte, error)
@@ -172,7 +174,9 @@ func parseSLPolicy(pf []byte) (*policy, error) {
 		DefaultAction string            `json:"default_action"`
 		Collectors    []json.RawMessage `json:"collectors"`
 		Attestor      json.RawMessage   `json:"attestor"`
-		Launcher      json.RawMessage   `json:"launcher`
+		Launcher      json.RawMessage   `json:"launcher"`
+		// Kernel        string            `json:"kernel"`
+		// Initrd        string            `json:"initrd"`
 	}
 
 	if err := json.Unmarshal(pf, &parse); err != nil {
@@ -191,14 +195,15 @@ func parseSLPolicy(pf []byte) (*policy, error) {
 		p.Collectors = append(p.Collectors, collector)
 	}
 
-	log.Printf("len(parse.Launcher)=%d, parse.Launcher=%s\n", len(parse.Launcher), parse.Launcher)
+	// log.Printf("len(parse.Launcher)=%d, parse.Launcher=%s\n", len(parse.Launcher), parse.Launcher)
 	if len(parse.Launcher) > 0 {
 		if err := json.Unmarshal(parse.Launcher, &p.Launcher); err != nil {
 			log.Printf("parseSLPolicy: Launcher Unmarshall error=%v!!\n", err)
 			return nil, err
 		}
 	}
-
+	// p.Kernel = parse.Kernel
+	// p.Initrd = parse.Initrd
 	return p, nil
 }
 
@@ -208,7 +213,9 @@ func main() {
 	if err != nil {
 		log.Printf("Couldn't talk to TPM Device: err=%v\n", err)
 	}
-	// Request TPM locality 2, requires extending go-tpm for locality request
+
+	log.Printf("TPM version %s", tpm.Version())
+	// TODO Request TPM locality 2, requires extending go-tpm for locality request
 
 	rawBytes, err := locateSLPolicy()
 	if err != nil {
@@ -233,12 +240,14 @@ func main() {
 		return
 	}
 
-	log.Printf("policy file parsed=%v\n", p)
+	// log.Printf("policy file parsed=%v\n", p)
 	for _, c := range p.Collectors {
-		fmt.Printf("%v\n", c)
+		log.Printf("Input Collector: %v\n", c)
 		c.Collect(&tpm)
 	}
 
+	//measurement.MeasureInputFile(p.Kernel)
+	//measurement.MeasureInputFile(p.Initrd)
 	p.Launcher.Boot()
 }
 

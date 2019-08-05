@@ -138,7 +138,7 @@ func FindConfigs(mountPath string) []*Config {
 			// TODO: log error
 			continue
 		}
-		fmt.Printf("Successful in reading configPath=%v\n", configPath)
+		log.Printf("Successful in reading configPath=%v\n", configPath)
 		var lines []string
 		if location.Type == syslinux {
 			lines = loadSyslinuxLines(configPath, contents)
