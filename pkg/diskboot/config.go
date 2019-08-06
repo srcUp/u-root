@@ -135,6 +135,7 @@ func FindConfigs(mountPath string) []*Config {
 		configPath := filepath.Join(mountPath, location.Path)
 		contents, err := ioutil.ReadFile(configPath)
 		if err != nil {
+			// log.Printf("err in reading configPath=%v\n", configPath)
 			// TODO: log error
 			continue
 		}

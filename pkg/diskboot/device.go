@@ -71,7 +71,7 @@ func FindDevice(devPath string) (*Device, error) {
 	if err != nil {
 		return nil, nil
 	}
-
+	fmt.Printf("devPath=%s\n", devPath)
 	return mountDevice(devPath, fstypes)
 }
 
@@ -80,8 +80,10 @@ func mountDevice(devPath string, fstypes []string) (*Device, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Failed to create tmp mount directory: %v", err)
 	}
+	fmt.Printf("mountPath=%s\n", mountPath)
 	for _, fstype := range fstypes {
 		if err := mount.Mount(devPath, mountPath, fstype, "", unix.MS_RDONLY); err != nil {
+			// fmt.Printf("Mounting error =%v\n", err)
 			continue
 		}
 

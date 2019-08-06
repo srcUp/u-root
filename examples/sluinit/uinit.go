@@ -23,21 +23,69 @@ import (
 )
 
 type launcher struct {
-	Type   string   `json:"type"`
-	Cmd    string   `json:"cmd"`
-	Params []string `json:"params"`
+	Type string `json:"type"`
+	// Cmd    string   `json:"cmd"`
+	Params map[string]string `json:"params"`
 }
 
-func (l *launcher) Boot() {
-	boot := exec.Command(l.Cmd, l.Params...)
+func (l *launcher) Boot(t *tpm.TPM) {
+	if l.Type != "kexec" {
+		log.Printf("Launcher: Unsupported launcher type. Exiting.\n")
+		return
+	}
+
+	// TODO: if kernel and initrd are on different devices.
+	kernel := l.Params["kernel"]
+	initrd := l.Params["initrd"]
+
+	s1 := strings.Split(kernel, ":")
+	if len(s1) != 2 {
+		fmt.Printf("%s: Usage: <block device identifier>:<path>\n", kernel)
+		return
+	}
+
+	devicePath := filepath.Join("/dev", s1[0])  // assumes deviceId is sda, devicePath=/dev/sda
+	dev, err := diskboot.FindDevice(devicePath) // FindDevice fn mounts devicePath=/dev/sda.
+	if err != nil {
+		fmt.Printf("err=%v\n", err)
+		return
+	}
+
+	kfilePath := dev.MountPath + s1[1] // mountPath=/tmp/path/to/target/file if /dev/sda mounted on /tmp
+
+	s2 := strings.Split(initrd, ":")
+	if len(s2) != 2 {
+		fmt.Printf("%s: Usage: <block device identifier>:<path>", initrd)
+		return
+	}
+
+	if s2[0] != s1[0] {
+		// TODO if kernel and initrd are on different devices.
+		return
+	}
+
+	ifilePath := dev.MountPath + s2[1]
+
+	if e := measurement.MeasureFile(t, kfilePath, dev.MountPath); e != nil {
+		log.Printf("Launcher: ERR: measure kernel file=%s, err=%v\n", kfilePath, e)
+		return
+	}
+
+	if e := measurement.MeasureFile(t, ifilePath, dev.MountPath); e != nil {
+		log.Printf("Launcher: ERR: measure initrd file=%s, err=%v\n", ifilePath, e)
+		return
+	}
+
+	log.Printf("running command : kexec -initrd ifilePath -l kfilePath\n", ifilePath, kfilePath)
+	boot := exec.Command("kexec", "-initrd", ifilePath, "-l", kfilePath)
 	boot.Stdin = os.Stdin
 	boot.Stderr = os.Stderr
 	boot.Stdout = os.Stdout
-
-	err := boot.Run()
-	if err != nil {
+	if err := boot.Run(); err != nil {
 		//need to decide how to bail, reboot, error msg & halt, or
 		//recovery shell
+		log.Printf("command finished with error: %v\n", err)
+		os.Exit(1)
 	}
 }
 
@@ -45,8 +93,6 @@ type policy struct {
 	DefaultAction string
 	Collectors    []measurement.Collector
 	Launcher      launcher
-	kernel        string
-	initrd        string
 }
 
 /* 	scanKernelCmdLine() ([]byte, error)
@@ -175,8 +221,6 @@ func parseSLPolicy(pf []byte) (*policy, error) {
 		Collectors    []json.RawMessage `json:"collectors"`
 		Attestor      json.RawMessage   `json:"attestor"`
 		Launcher      json.RawMessage   `json:"launcher"`
-		// Kernel        string            `json:"kernel"`
-		// Initrd        string            `json:"initrd"`
 	}
 
 	if err := json.Unmarshal(pf, &parse); err != nil {
@@ -202,8 +246,6 @@ func parseSLPolicy(pf []byte) (*policy, error) {
 			return nil, err
 		}
 	}
-	// p.Kernel = parse.Kernel
-	// p.Initrd = parse.Initrd
 	return p, nil
 }
 
@@ -248,7 +290,7 @@ func main() {
 
 	//measurement.MeasureInputFile(p.Kernel)
 	//measurement.MeasureInputFile(p.Initrd)
-	p.Launcher.Boot()
+	p.Launcher.Boot(&tpm)
 }
 
 // populate required modules here

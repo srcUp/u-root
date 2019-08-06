@@ -33,7 +33,7 @@ func NewStorageCollector(config []byte) (Collector, error) {
 }
 
 // code found here: https://gist.github.com/minikomi/2900454
-func ReadDisk(mountPath string) (byteCount int, buffer *bytes.Buffer) {
+func ReadDisk(mountPath string) (byteCount int, buffer *bytes.Buffer, e error) {
 
 	data, err := os.Open(mountPath)
 	if err != nil {
@@ -52,14 +52,15 @@ func ReadDisk(mountPath string) (byteCount int, buffer *bytes.Buffer) {
 		}
 		buffer.Write(part[:count])
 	}
+
+	byteCount = buffer.Len()
 	if err != io.EOF {
-		log.Fatal("Error Reading ", mountPath, ": ", err)
+		log.Printf("Error Reading ", mountPath, ": ", err)
+		return byteCount, nil, err
 	} else {
 		err = nil
 	}
-
-	byteCount = buffer.Len()
-	return
+	return byteCount, buffer, nil
 }
 
 /* - mount block device
@@ -74,7 +75,11 @@ func MeasureStorageDevice(t *tpm.TPM, blkDevicePath string) error {
 		return err
 	}
 
-	buflen, buf := ReadDisk(dev.MountPath)
+	buflen, buf, err := ReadDisk(dev.MountPath)
+	if err != nil {
+		return err
+	}
+
 	if e := mount.Unmount(dev.MountPath, true, false); e != nil {
 		log.Printf("Storage Collector: Unmount failed. PANIC\n")
 		panic(e)

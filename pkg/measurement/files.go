@@ -28,6 +28,43 @@ func NewFileCollector(config []byte) (Collector, error) {
 	return fc, nil
 }
 
+// inputVal is of format <block device identifier>:<path>
+// Example sda:/path/to/file
+/* - mount device and return
+*  - NOTE!!!: This function does not unmount. Caller needs to unmount.
+*  - Returns filePath, mountPath and error
+ */
+func ParseInput(inputVal string) (string, string, error) {
+	s := strings.Split(inputVal, ":")
+	if len(s) != 2 {
+		return "", "", fmt.Errorf("%s: Usage: <block device identifier>:<path>", inputVal)
+	}
+
+	devicePath := filepath.Join("/dev", s[0])   // assumes deviceId is sda, devicePath=/dev/sda
+	dev, err := diskboot.FindDevice(devicePath) // FindDevice fn mounts devicePath=/dev/sda.
+	if err != nil {
+		return "", "", err
+	}
+
+	filePath := dev.MountPath + s[1] // mountPath=/tmp/path/to/target/file if /dev/sda mounted on /tmp
+	return filePath, dev.MountPath, nil
+}
+
+func MeasureFile(t *tpm.TPM, filePath string, mountPath string) error {
+	d, err := ioutil.ReadFile(filePath)
+	if e := mount.Unmount(mountPath, true, false); e != nil {
+		log.Printf("File Collector: Unmount failed. PANIC\n")
+		panic(e)
+	}
+
+	if err != io.EOF {
+		return fmt.Errorf("Error reading target file: filePath=%s, mountPath=%s",
+			filePath, mountPath)
+	}
+
+	return (*t).Measure(pcrIndex, d)
+}
+
 // measures file input by user in policy file and store in TPM.
 // inputVal is of format <block device identifier>:<path>
 // Example sda:/path/to/file
@@ -37,31 +74,14 @@ func NewFileCollector(config []byte) (Collector, error) {
  * - Measure byte slice and store in TPM.
  */
 func MeasureInputFile(t *tpm.TPM, inputVal string) error {
-	s := strings.Split(inputVal, ":")
-	if len(s) != 2 {
-		return fmt.Errorf("%s: Usage: <block device identifier>:<path>", inputVal)
-	}
 
-	devicePath := filepath.Join("/dev", s[0])   // assumes deviceId is sda, devicePath=/dev/sda
-	dev, err := diskboot.FindDevice(devicePath) // FindDevice fn mounts devicePath=/dev/sda.
+	filePath, mountPath, err := ParseInput(inputVal)
 	if err != nil {
 		return err
 	}
 
-	filePath := dev.MountPath + s[1] // mountPath=/tmp/path/to/target/file if /dev/sda mounted on /tmp
-	log.Printf("File Collector: reading file=%s\n", filePath)
-	d, err := ioutil.ReadFile(filePath)
-	if e := mount.Unmount(dev.MountPath, true, false); e != nil {
-		log.Printf("File Collector: Unmount failed. PANIC\n")
-		panic(e)
-	}
-
-	if err != io.EOF {
-		return fmt.Errorf("Error reading target file: mountPath=%s, devicePath=%s, passed=%s",
-			filePath, devicePath, inputVal)
-	}
-
-	return (*t).Measure(pcrIndex, d)
+	log.Printf("File Collector: fileP=%s, mountP=%s\n", filePath, mountPath)
+	return MeasureFile(t, filePath, mountPath)
 }
 
 func (s *FileCollector) Collect(t *tpm.TPM) error {
