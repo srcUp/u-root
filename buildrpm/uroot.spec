@@ -16,7 +16,8 @@ BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-buildroot
 BuildRequires:  golang git
 
 %define initramfs_name uroot-initramfs.cpio
-%define gopath %{_builddir}/%{name}-%{version}
+%define gopath    %{_builddir}/%{name}-%{version}
+%define uroot_top %{gopath}/src/github.com/u-root/u-root
 
 %description
 u-root("universal root") creates an embeddable root file system intended to be used as initramfs in UEK secure launch kernel.
@@ -26,13 +27,14 @@ u-root("universal root") creates an embeddable root file system intended to be u
 %setup -c -n %{name}-%{version}/src/github.com/u-root -q -D
 
 %build
+mv %{name}-%{version} %{name}
 cd %{name}
 GOPATH=%{gopath} go build -v -o u-root
 GOPATH=%{gopath} ./u-root -format=cpio -build=bb -files `which modprobe` -files `which depmod` -files /lib/modules/`uname -r`/ -o %{initramfs_name} ./cmds/boot/* ./cmds/exp/* ./cmds/core/* ./examples/sluinit/*
 
 %install
 mkdir -p %{buildroot}/boot
-install -m 0755 %{gopath}/src/github.com/u-root/u-root/%{initramfs_name} %{buildroot}/boot/
+install -m 0755 %{uroot_top}/%{initramfs_name} %{buildroot}/boot/
 
 %files
 /boot/%{initramfs_name}
@@ -40,5 +42,8 @@ install -m 0755 %{gopath}/src/github.com/u-root/u-root/%{initramfs_name} %{build
 %clean
 
 %changelog
+* Wed Aug 7 2019 Simran Singh simran.p.singh@oracle.com
+- Created a uroot_top define.
+- uroot does not need version in directory name. fix it by mv command
 * Mon Aug 5 2019 Simran Singh simran.p.singh@oracle.com
 - initial spec file for u-root
