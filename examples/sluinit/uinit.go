@@ -28,6 +28,30 @@ type launcher struct {
 	Params map[string]string `json:"params"`
 }
 
+// obtains file path based on input entered by user in policy file.
+// inputVal is of format <block device identifier>:<path>
+// Example sda:/path/to/file
+/* - mount device
+ * - Get file Path on mounted device.
+ * - Unmount device
+ */
+func GetMountedFilePath(inputVal string) (string, error) {
+	s := strings.Split(inputVal, ":")
+	if len(s) != 2 {
+		return "", fmt.Errorf("%s: Usage: <block device identifier>:<path>\n", inputVal)
+	}
+
+	devicePath := filepath.Join("/dev", s[0])   // assumes deviceId is sda, devicePath=/dev/sda
+	dev, err := diskboot.FindDevice(devicePath) // FindDevice fn mounts devicePath=/dev/sda.
+	if err != nil {
+		fmt.Printf("err=%v\n", err)
+		return "", err
+	}
+
+	filePath := dev.MountPath + s[1] // mountPath=/tmp/path/to/target/file if /dev/sda mounted on /tmp
+	return filePath, nil
+}
+
 func (l *launcher) Boot(t *tpm.TPM) {
 	if l.Type != "kexec" {
 		log.Printf("Launcher: Unsupported launcher type. Exiting.\n")
@@ -38,46 +62,30 @@ func (l *launcher) Boot(t *tpm.TPM) {
 	kernel := l.Params["kernel"]
 	initrd := l.Params["initrd"]
 
-	s1 := strings.Split(kernel, ":")
-	if len(s1) != 2 {
-		fmt.Printf("%s: Usage: <block device identifier>:<path>\n", kernel)
+	if e := measurement.MeasureInputFile(t, kernel); e != nil {
+		log.Printf("Launcher: ERR: measure kernel input=%s, err=%v\n", kernel, e)
 		return
 	}
 
-	devicePath := filepath.Join("/dev", s1[0])  // assumes deviceId is sda, devicePath=/dev/sda
-	dev, err := diskboot.FindDevice(devicePath) // FindDevice fn mounts devicePath=/dev/sda.
-	if err != nil {
-		fmt.Printf("err=%v\n", err)
+	if e := measurement.MeasureInputFile(t, initrd); e != nil {
+		log.Printf("Launcher: ERR: measure initrd input=%s, err=%v\n", initrd, e)
 		return
 	}
 
-	kfilePath := dev.MountPath + s1[1] // mountPath=/tmp/path/to/target/file if /dev/sda mounted on /tmp
-
-	s2 := strings.Split(initrd, ":")
-	if len(s2) != 2 {
-		fmt.Printf("%s: Usage: <block device identifier>:<path>", initrd)
+	k, e := GetMountedFilePath(kernel)
+	if e != nil {
+		log.Printf("Launcher: ERR: kernel input %s couldnt be located, err=%v\n", kernel, e)
 		return
 	}
 
-	if s2[0] != s1[0] {
-		// TODO if kernel and initrd are on different devices.
+	i, e := GetMountedFilePath(initrd)
+	if e != nil {
+		log.Printf("Launcher: ERR: initrd input %s couldnt be located, err=%v\n", initrd, e)
 		return
 	}
 
-	ifilePath := dev.MountPath + s2[1]
-
-	if e := measurement.MeasureFile(t, kfilePath, dev.MountPath); e != nil {
-		log.Printf("Launcher: ERR: measure kernel file=%s, err=%v\n", kfilePath, e)
-		return
-	}
-
-	if e := measurement.MeasureFile(t, ifilePath, dev.MountPath); e != nil {
-		log.Printf("Launcher: ERR: measure initrd file=%s, err=%v\n", ifilePath, e)
-		return
-	}
-
-	log.Printf("running command : kexec -initrd ifilePath -l kfilePath\n", ifilePath, kfilePath)
-	boot := exec.Command("kexec", "-initrd", ifilePath, "-l", kfilePath)
+	log.Printf("running command : kexec -initrd %s -l %s\n", i, k)
+	boot := exec.Command("kexec", "-i", i, "-l", k)
 	boot.Stdin = os.Stdin
 	boot.Stderr = os.Stderr
 	boot.Stdout = os.Stdout
