@@ -61,6 +61,7 @@ func (l *launcher) Boot(t *tpm.TPM) {
 	// TODO: if kernel and initrd are on different devices.
 	kernel := l.Params["kernel"]
 	initrd := l.Params["initrd"]
+	cmdline := l.Params["cmdline"]
 
 	if e := measurement.MeasureInputFile(t, kernel); e != nil {
 		log.Printf("Launcher: ERR: measure kernel input=%s, err=%v\n", kernel, e)
@@ -84,11 +85,20 @@ func (l *launcher) Boot(t *tpm.TPM) {
 		return
 	}
 
-	log.Printf("running command : kexec -initrd %s -l %s\n", i, k)
-	boot := exec.Command("kexec", "-i", i, "-l", k)
+	log.Printf("running command : kexec -initrd %s -l %s -c %s\n", i, k, cmdline)
+	boot := exec.Command("kexec", "-i", i, "-l", k, "-c", cmdline)
+
 	boot.Stdin = os.Stdin
 	boot.Stderr = os.Stderr
 	boot.Stdout = os.Stdout
+	if err := boot.Run(); err != nil {
+		//need to decide how to bail, reboot, error msg & halt, or
+		//recovery shell
+		log.Printf("command finished with error: %v\n", err)
+		os.Exit(1)
+	}
+
+	boot = exec.Command("kexec", "-e")
 	if err := boot.Run(); err != nil {
 		//need to decide how to bail, reboot, error msg & halt, or
 		//recovery shell
