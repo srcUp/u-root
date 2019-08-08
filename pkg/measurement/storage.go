@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/TrenchBoot/tpmtool/pkg/tpm"
-	"github.com/u-root/u-root/pkg/diskboot"
-	"github.com/u-root/u-root/pkg/mount"
 	"io"
 	"log"
 	"os"
@@ -33,11 +31,11 @@ func NewStorageCollector(config []byte) (Collector, error) {
 }
 
 // code found here: https://gist.github.com/minikomi/2900454
-func ReadDisk(mountPath string) (byteCount int, buffer *bytes.Buffer, e error) {
+func ReadDisk(blkDevPath string) (byteCount int, buffer *bytes.Buffer, e error) {
 
-	data, err := os.Open(mountPath)
+	data, err := os.Open(blkDevPath)
 	if err != nil {
-		log.Fatal(err)
+		return 0, nil, err
 	}
 	defer data.Close()
 
@@ -54,41 +52,31 @@ func ReadDisk(mountPath string) (byteCount int, buffer *bytes.Buffer, e error) {
 	}
 
 	byteCount = buffer.Len()
-	if err != io.EOF {
-		log.Printf("Error Reading ", mountPath, ": ", err)
-		return byteCount, nil, err
-	} else {
-		err = nil
+	if err == io.EOF {
+		log.Printf("End of disk. Read %v bytes\n", byteCount)
+		return byteCount, buffer, nil
+	}
+
+	if err != nil {
+		return byteCount, nil, fmt.Errorf("Error Reading ", blkDevPath, ": ", err)
 	}
 	return byteCount, buffer, nil
 }
 
-/* - mount block device
- * - Read block device in chunks into a buffer
- * - Unmount block device
- * - Measure buffer and store in TPM.
+/* -
+ * - Reads block device in one go: TODO: make this efficient
+ * - Store data read above in TPM.
  */
 func MeasureStorageDevice(t *tpm.TPM, blkDevicePath string) error {
+
 	log.Printf("Storage Collector: Measuring block device %s\n", blkDevicePath)
-	dev, err := diskboot.FindDevice(blkDevicePath) // FindDevice fn mounts devicePath=/dev/sda.
+	buflen, buf, err := ReadDisk(blkDevicePath)
 	if err != nil {
-		return err
+		return fmt.Errorf("Storage Collector: buflen=%v, err=%v\n", buflen, err)
 	}
-
-	buflen, buf, err := ReadDisk(dev.MountPath)
-	if err != nil {
-		return err
-	}
-
-	if e := mount.Unmount(dev.MountPath, true, false); e != nil {
-		log.Printf("Storage Collector: Unmount failed. PANIC\n")
-		panic(e)
-	}
-
 	if buflen == 0 {
 		return fmt.Errorf("Empty Disk %s Nothing to measure.\n", blkDevicePath)
 	}
-
 	return (*t).Measure(pcrIndex, buf.Bytes())
 }
 

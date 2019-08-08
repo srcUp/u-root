@@ -57,12 +57,13 @@ func (l *launcher) Boot(t *tpm.TPM) {
 		log.Printf("Launcher: Unsupported launcher type. Exiting.\n")
 		return
 	}
-
+	log.Printf("Identified Launcher Type = Kexec\n")
 	// TODO: if kernel and initrd are on different devices.
 	kernel := l.Params["kernel"]
 	initrd := l.Params["initrd"]
 	cmdline := l.Params["cmdline"]
 
+	log.Printf("********Step 6: Measuring kernel, initrd ********\n")
 	if e := measurement.MeasureInputFile(t, kernel); e != nil {
 		log.Printf("Launcher: ERR: measure kernel input=%s, err=%v\n", kernel, e)
 		return
@@ -85,6 +86,7 @@ func (l *launcher) Boot(t *tpm.TPM) {
 		return
 	}
 
+	log.Printf("********Step 7: kexec called  ********\n")
 	log.Printf("running command : kexec -initrd %s -l %s -c %s\n", i, k, cmdline)
 	boot := exec.Command("kexec", "-i", i, "-l", k, "-c", cmdline)
 
@@ -268,7 +270,7 @@ func parseSLPolicy(pf []byte) (*policy, error) {
 }
 
 func main() {
-	log.Printf("init completed. starting main ......\n")
+	log.Printf("********Step 1: init completed. starting main ********\n")
 	tpm, err := tpm.NewTPM()
 	if err != nil {
 		log.Printf("Couldn't talk to TPM Device: err=%v\n", err)
@@ -277,6 +279,7 @@ func main() {
 	log.Printf("TPM version %s", tpm.Version())
 	// TODO Request TPM locality 2, requires extending go-tpm for locality request
 
+	log.Printf("********Step 2: locateSLPolicy ********\n")
 	rawBytes, err := locateSLPolicy()
 	if err != nil {
 		log.Printf("locateSLPolicy failed: err=%v\n", err)
@@ -285,6 +288,7 @@ func main() {
 	}
 
 	log.Printf("policy file located\n")
+	log.Printf("********Step 3: parseSLPolicy ********\n")
 	// The policy file must be measured and extended into PCR21 (PCR15
 	// until DRTM launch is working and able to set locality
 	p, err := parseSLPolicy(rawBytes)
@@ -300,14 +304,17 @@ func main() {
 		return
 	}
 
+	log.Printf("policy file parsed\n")
+
+	log.Printf("********Step 4: Collecting Evidence ********\n")
 	// log.Printf("policy file parsed=%v\n", p)
 	for _, c := range p.Collectors {
 		log.Printf("Input Collector: %v\n", c)
 		c.Collect(&tpm)
 	}
+	log.Printf("Collectors completed\n")
 
-	//measurement.MeasureInputFile(p.Kernel)
-	//measurement.MeasureInputFile(p.Initrd)
+	log.Printf("********Step 5: Launcher called ********\n")
 	p.Launcher.Boot(&tpm)
 }
 

@@ -27,7 +27,7 @@ func GetCollector(config []byte) (Collector, error) {
 	}
 	err := json.Unmarshal(config, &header)
 	if err != nil {
-		fmt.Printf("Unmarshal errir in measurement pkg\n")
+		fmt.Printf("Measurement: Unmarshal error\n")
 		return nil, err
 	}
 
