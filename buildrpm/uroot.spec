@@ -5,7 +5,7 @@
 # upstream u-root uses hiphen in name in source tree.
 Name:           u-root
 Version:        5.0.0	
-Release:        0.9%{?dist}
+Release:        1.0%{?dist}
 Summary:        u-root initramfs used in UEK secure launch kernel.
 Group:		    Unspecified
 License:        BSD 3-Clause License 
