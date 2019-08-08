@@ -11,8 +11,14 @@ type Collector interface {
 	Collect(t *tpm.TPM) error
 }
 
+const (
+	pcrIndex uint32 = 23
+)
+
 var supportedCollectors = map[string]func([]byte) (Collector, error){
 	"storage": NewStorageCollector,
+	"dmi":     NewDmiCollector,
+	"files":   NewFileCollector,
 }
 
 func GetCollector(config []byte) (Collector, error) {
@@ -21,6 +27,7 @@ func GetCollector(config []byte) (Collector, error) {
 	}
 	err := json.Unmarshal(config, &header)
 	if err != nil {
+		fmt.Printf("Measurement: Unmarshal error\n")
 		return nil, err
 	}
 
