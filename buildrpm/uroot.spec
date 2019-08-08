@@ -37,7 +37,7 @@ GOPATH=%{gopath} ./u-root -format=cpio -build=bb -files `which modprobe` -files 
 %install
 mkdir -p %{buildroot}/boot
 install -m 0755 %{uroot_top}/%{initramfs_name} %{buildroot}/boot/
-install -m 0755 %{uroot_top}/buildrpm/securelaunch.policy %{buildroot}/boot/
+install -m 0755 %{uroot_top}/securelaunch.policy %{buildroot}/boot/
 
 %files
 /boot/%{initramfs_name}
