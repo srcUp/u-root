@@ -41,6 +41,10 @@ func init() {
 	cmdList = []string{
 		r("/inito"),
 
+		r("/bbin/sluinit"),
+		r("/bin/sluinit"),
+		r("/buildbin/sluinit"),
+
 		r("/bbin/uinit"),
 		r("/bin/uinit"),
 		r("/buildbin/uinit"),

@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/TrenchBoot/tpmtool/pkg/tpm"
 	"github.com/digitalocean/go-smbios/smbios"
+	"github.com/google/go-tpm/tpm2"
+	"github.com/google/go-tpm/tpmutil"
+	"io"
 	"log"
 )
 
@@ -104,7 +106,7 @@ var type_table = map[string]uint8{
 	"Onboard Device":                   41,
 }
 
-func (s *DmiCollector) Collect(t *tpm.TPM) error {
+func (s *DmiCollector) Collect(rwc io.ReadWriter) error {
 	log.Printf("DMI Collector: Entering \n")
 	if s.Type != "dmi" {
 		return errors.New("Invalid type passed to a DmiCollector method")
@@ -149,7 +151,9 @@ func (s *DmiCollector) Collect(t *tpm.TPM) error {
 			// TODO: Extract and Measure specific "Fields" of a FieldCluster on user's request.
 			// For example: for BIOS type(type=0), currently we measure entire output
 			// but in future we could measure individual fields like bios-vendor, bios-version etc.
-			if e := (*t).Measure(pcrIndex, b.Bytes()); e != nil {
+
+			hash := hashSum(b.Bytes())
+			if e := tpm2.PCRExtend(rwc, tpmutil.Handle(pcr), tpm2.AlgSHA256, hash, ""); e != nil {
 				return e
 			}
 		}

@@ -3,7 +3,9 @@ package measurement
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/TrenchBoot/tpmtool/pkg/tpm"
+	"github.com/google/go-tpm/tpm2"
+	"github.com/google/go-tpm/tpmutil"
+	// "github.com/TrenchBoot/tpmtool/pkg/tpm"
 	"github.com/u-root/u-root/pkg/diskboot"
 	"github.com/u-root/u-root/pkg/mount"
 	"io"
@@ -36,7 +38,7 @@ func NewFileCollector(config []byte) (Collector, error) {
  * - Unmount device
  * - Measure byte slice and store in TPM.
  */
-func MeasureInputFile(t *tpm.TPM, inputVal string) error {
+func MeasureInputFile(rwc io.ReadWriter, inputVal string) error {
 	s := strings.Split(inputVal, ":")
 	if len(s) != 2 {
 		return fmt.Errorf("%s: Usage: <block device identifier>:<path>", inputVal)
@@ -66,14 +68,16 @@ func MeasureInputFile(t *tpm.TPM, inputVal string) error {
 			filePath, dev.MountPath, inputVal, err)
 	}
 
-	return (*t).Measure(pcrIndex, d)
+	hash := hashSum(d)
+	return tpm2.PCRExtend(rwc, tpmutil.Handle(pcr), tpm2.AlgSHA256, hash, "")
+
 }
 
-func (s *FileCollector) Collect(t *tpm.TPM) error {
+func (s *FileCollector) Collect(rwc io.ReadWriter) error {
 
 	for _, inputVal := range s.Paths {
 		// inputVal is of type sda:/path/to/file
-		err := MeasureInputFile(t, inputVal)
+		err := MeasureInputFile(rwc, inputVal)
 		if err != nil {
 			log.Printf("File Collector: input=%s, err = %v", inputVal, err)
 			return err

@@ -5,7 +5,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/TrenchBoot/tpmtool/pkg/tpm"
+	// "github.com/TrenchBoot/tpmtool/pkg/tpm"
+	"github.com/google/go-tpm/tpm2"
+	"github.com/google/go-tpm/tpmutil"
 	"io"
 	"log"
 	"os"
@@ -67,7 +69,7 @@ func ReadDisk(blkDevPath string) (byteCount int, buffer *bytes.Buffer, e error) 
  * - Reads block device in one go: TODO: make this efficient
  * - Store data read above in TPM.
  */
-func MeasureStorageDevice(t *tpm.TPM, blkDevicePath string) error {
+func MeasureStorageDevice(rwc io.ReadWriter, blkDevicePath string) error {
 
 	log.Printf("Storage Collector: Measuring block device %s\n", blkDevicePath)
 	buflen, buf, err := ReadDisk(blkDevicePath)
@@ -77,13 +79,15 @@ func MeasureStorageDevice(t *tpm.TPM, blkDevicePath string) error {
 	if buflen == 0 {
 		return fmt.Errorf("Empty Disk %s Nothing to measure.\n", blkDevicePath)
 	}
-	return (*t).Measure(pcrIndex, buf.Bytes())
+
+	hash := hashSum(buf.Bytes())
+	return tpm2.PCRExtend(rwc, tpmutil.Handle(pcr), tpm2.AlgSHA256, hash, "")
 }
 
-func (s *StorageCollector) Collect(t *tpm.TPM) error {
+func (s *StorageCollector) Collect(rwc io.ReadWriter) error {
 
 	for _, inputVal := range s.Paths {
-		err := MeasureStorageDevice(t, inputVal) // inputVal is blkDevicePath e.g /dev/sda
+		err := MeasureStorageDevice(rwc, inputVal) // inputVal is blkDevicePath e.g /dev/sda
 		if err != nil {
 			log.Printf("Storage Collector: input = %s, err = %v", inputVal, err)
 			return err

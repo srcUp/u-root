@@ -133,14 +133,18 @@ var (
 func FindConfigs(mountPath string) []*Config {
 	var configs []*Config
 
+	log.Printf("mountPath=%s", mountPath)
 	for _, location := range locations {
 		configPath := filepath.Join(mountPath, location.Path)
+		log.Printf("configPath=%v\n", configPath)
 		contents, err := ioutil.ReadFile(configPath)
 		if err != nil {
+			log.Printf("Error configPath=%s", configPath)
 			// TODO: log error
 			continue
 		}
 
+		log.Printf("Success configPath=%s", configPath)
 		var lines []string
 		if location.Type == syslinux {
 			lines = loadSyslinuxLines(configPath, contents)

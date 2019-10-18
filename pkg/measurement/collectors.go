@@ -1,17 +1,19 @@
 package measurement
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-
-	"github.com/TrenchBoot/tpmtool/pkg/tpm"
+	"io"
+	// "github.com/google/go-tpm/tpm2"
 )
 
 type Collector interface {
-	Collect(t *tpm.TPM) error
+	Collect(t io.ReadWriter) error
 }
 
 const (
+	pcr             = int(16)
 	pcrIndex uint32 = 23
 )
 
@@ -19,6 +21,11 @@ var supportedCollectors = map[string]func([]byte) (Collector, error){
 	"storage": NewStorageCollector,
 	"dmi":     NewDmiCollector,
 	"files":   NewFileCollector,
+}
+
+func hashSum(in []byte) []byte {
+	s := sha256.Sum256(in)
+	return s[:]
 }
 
 func GetCollector(config []byte) (Collector, error) {
