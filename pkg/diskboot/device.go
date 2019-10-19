@@ -41,7 +41,7 @@ func FindDevices(devicesGlob string) (devices []*Device) {
 	for _, sys := range sysList {
 		blk := filepath.Join("/dev", filepath.Base(sys))
 
-		log.Printf("Attempting to mount %s", blk)
+		log.Printf("FindDevices: Attempting to mount %s", blk)
 		dev, _ := mountDevice(blk, fstypes)
 		if dev != nil && len(dev.Configs) > 0 {
 			devices = append(devices, dev)
@@ -62,27 +62,30 @@ func FindDevice(devPath string) (*Device, error) {
 }
 
 func mountDevice(devPath string, fstypes []string) (*Device, error) {
-	log.Printf("mounting dev=%s\n", devPath)
+	log.Printf("mountDevice: ENTER w %s\n", devPath)
 
 	mountPath, err := ioutil.TempDir("/tmp", "boot-")
 	if err != nil {
+		log.Printf("mountDevice: EXIT")
 		return nil, fmt.Errorf("Failed to create tmp mount directory: %v", err)
 	}
-	log.Printf("mountPath=%v\n", mountPath)
+	log.Printf("mountDevice: mountPath=%v\n", mountPath)
 	for _, fstype := range fstypes {
 		log.Printf("fstype=%v\n", fstype)
 		if err := mount.Mount(devPath, mountPath, fstype, "", unix.MS_RDONLY); err != nil {
-			log.Printf("mount Failed..continuing to next fstype\n")
+			log.Printf("mountDevice: mount Failed..continuing to next fstype\n")
 			continue
 		}
 
 		configs := FindConfigs(mountPath)
 		if len(configs) == 0 {
-			log.Printf("FindConfigs returned 0 configs. BUT I AM OKAY WITH IT\n")
-			// continue
+			log.Printf("mountDevice: No config file found at %s, Will try a different fstype", mountPath)
+			continue
 		}
 
+		log.Printf("mountDevice: EXIT")
 		return &Device{devPath, mountPath, fstype, configs}, nil
 	}
+	log.Printf("mountDevice: EXIT")
 	return nil, fmt.Errorf("Failed to find a valid boot device with configs")
 }

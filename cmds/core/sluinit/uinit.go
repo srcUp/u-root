@@ -23,6 +23,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 type launcher struct {
@@ -47,7 +48,7 @@ func GetMountedFilePath(inputVal string) (string, error) {
 	devicePath := filepath.Join("/dev", s[0])   // assumes deviceId is sda, devicePath=/dev/sda
 	dev, err := diskboot.FindDevice(devicePath) // FindDevice fn mounts devicePath=/dev/sda.
 	if err != nil {
-		fmt.Printf("err=%v\n", err)
+		fmt.Printf("Mount %v failed, err=%v\n", devicePath, err)
 		return "", err
 	}
 
@@ -334,6 +335,77 @@ func main() {
 	p.Launcher.Boot(tpm2)
 }
 
+// To run the daemon in debug mode please pass the parameter  '-d <debug level>'
+// DEBUG         4 - Print all messages
+// INFO          3 - Print messages needed to follow the uIP code (default)
+// WARN          2 - Print warning messages
+// ERROR         1 - Only print critical errors
+// netroot=iscsi:@10.196.210.62::3260::iqn.1986-03.com.sun:ovs112-boot rd.iscsi.initiator=iqn.1988-12.com.oracle:ovs112
+// netroot=iscsi:@10.196.210.64::3260::iqn.1986-03.com.sun:ovs112-boot
+//NOTE:  if you have two netroot params in kernel command line , second one will be used.
+func scanIscsiDrives() error {
+
+	log.Printf("Scanning kernel cmd line for *netroot* flag")
+	val, ok := cmdline.Flag("netroot")
+	if !ok {
+		log.Printf("sl_policy netroot flag is not set")
+		return errors.New("Flag Not Set")
+	}
+
+	// val = iscsi:@10.196.210.62::3260::iqn.1986-03.com.sun:ovs112-boot
+	log.Printf("netroot flag is set with val=%s", val)
+	s := strings.Split(val, "::")
+	if len(s) != 3 {
+		return fmt.Errorf("%v: incorrect format ::,  Usage: netroot=iscsi:@10.X.Y.Z::1224::iqn.foo:hostname-bar, [Expecting len(%s) = 3] ", val, s)
+	}
+
+	// s[0] = iscsi:@10.196.210.62 or iscsi:@10.196.210.62,2
+	// s[1] = 3260
+	// s[2] = iqn.1986-03.com.sun:ovs112-boot
+	port := s[1]
+	target := s[2]
+	tmp := strings.Split(s[0], ":@")
+	if len(tmp) > 3 || len(tmp) < 2 {
+		return fmt.Errorf("%v: incorrect format :@, Usage: netroot=iscsi:@10.X.Y.Z::1224::iqn.foo:hostname-bar, [ Expecting 2 <= len(%s) <= 3", val, tmp)
+	}
+
+	if tmp[0] != "iscsi" {
+		return fmt.Errorf("%v: incorrect format iscsi:, Usage: netroot=iscsi:@10.X.Y.Z::1224::iqn.foo:hostname-bar, [ %s != 'iscsi'] ", val, tmp[0])
+	}
+
+	var ip, group string
+	tmp2 := strings.Split(tmp[1], ",")
+	if len(tmp2) == 1 {
+		ip = tmp[1]
+	} else if len(tmp2) == 2 {
+		ip = tmp[1]
+		group = tmp[2]
+	}
+
+	log.Printf("Scanning kernel cmd line for *rd.iscsi.initiator* flag")
+	initiatorName, ok := cmdline.Flag("rd.iscsi.initiator")
+	if !ok {
+		log.Printf("sl_policy rd.iscsi.initiator flag is not set")
+		return errors.New("Flag Not Set")
+	}
+
+	var portalGroup string
+	if group == "" {
+		portalGroup = "1"
+	}
+
+	cmd00 := exec.Command("iscsistart", "-d=ERROR", "-a", ip, "-g", portalGroup, "-p", port, "-t", target, "-i", initiatorName)
+	var out00 bytes.Buffer
+	cmd00.Stdout = &out00
+	log.Printf("Executing %v", cmd00.Args)
+	if err00 := cmd00.Run(); err00 != nil {
+		fmt.Println("Err:= %s", err00)
+	} else {
+		log.Printf("Output: \n%v", cmd00.Stdout)
+	}
+	return nil
+}
+
 // populate required modules here
 func init() {
 
@@ -428,17 +500,19 @@ func init() {
 			log.Printf("Mounted at dev %v", device2)
 		}*/
 
-	// iscsistart -a 10.196.210.62 -g 1 -t iqn.1986-03.com.sun:ovs112-boot -i iqn.1988-12.com.oracle:ovs112
-	cmd00 := exec.Command("iscsistart", "-a", "10.196.210.62", "-g", "1", "-t", "iqn.1986-03.com.sun:ovs112-boot", "-i", "iqn.1988-12.com.oracle:ovs112")
-	var out00 bytes.Buffer
-	cmd00.Stdout = &out00
-	log.Printf("Executing %v", cmd00.Args)
-	if err00 := cmd00.Run(); err00 != nil {
-		fmt.Println(err00)
-	} else {
-		log.Printf("Output: \n%v", cmd00.Stdout)
-	}
-
+	/*
+		// iscsistart -a 10.196.210.62 -g 1 -t iqn.1986-03.com.sun:ovs112-boot -i iqn.1988-12.com.oracle:ovs112
+		cmd00 := exec.Command("iscsistart", "-a", "10.211.11.101", "-g", "1", "-t", "iqn.2003-01.org.linux-iscsi.ca-virt1-1.x8664:sn.fe34c16ae741", "-i", "iqn.1988-12.com.oracle:debcc0ab1ba2")
+		// cmd00 := exec.Command("iscsistart", "-a", "10.196.210.62", "-g", "1", "-t", "iqn.1986-03.com.sun:ovs112-boot", "-i", "iqn.1988-12.com.oracle:ovs112")
+		var out00 bytes.Buffer
+		cmd00.Stdout = &out00
+		log.Printf("Executing %v", cmd00.Args)
+		if err00 := cmd00.Run(); err00 != nil {
+			fmt.Println(err00)
+		} else {
+			log.Printf("Output: \n%v", cmd00.Stdout)
+		}
+	*/
 	cmd0 := exec.Command("bash", "-c", "cpuid > /tmp/cpuid.txt")
 	var out0 bytes.Buffer
 	cmd0.Stdout = &out0
@@ -513,6 +587,10 @@ func init() {
 			log.Printf("Output: \n%v", cmd03.Stdout)
 		}
 	*/
+	err := scanIscsiDrives()
+	if err != nil {
+		log.Printf("NO ISCSI DRIVES found, err=[%v]", err)
+	}
 
 	cmd1 := exec.Command("ls", "/sys/class/net")
 	var out1 bytes.Buffer
@@ -532,5 +610,11 @@ func init() {
 		fmt.Println(err2)
 	} else {
 		log.Printf("Output: \n%v", cmd2.Stdout)
+	}
+
+	s := "sleeping, press CTRL C if u like"
+	for i := 0; i < 5; i++ {
+		time.Sleep(5 * time.Second)
+		fmt.Println(s)
 	}
 }

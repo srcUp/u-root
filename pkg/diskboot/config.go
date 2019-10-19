@@ -132,19 +132,20 @@ var (
 // and returns a Config for each valid instance found.
 func FindConfigs(mountPath string) []*Config {
 	var configs []*Config
+	var count int
 
-	log.Printf("mountPath=%s", mountPath)
+	log.Printf("FindConfigs: mountPath=%s", mountPath)
 	for _, location := range locations {
 		configPath := filepath.Join(mountPath, location.Path)
-		log.Printf("configPath=%v\n", configPath)
+		// log.Printf("FindConfigs: configPath=%v\n", configPath)
 		contents, err := ioutil.ReadFile(configPath)
 		if err != nil {
-			log.Printf("Error configPath=%s", configPath)
+			// log.Printf("Error configPath=%s", configPath)
 			// TODO: log error
 			continue
 		}
 
-		log.Printf("Success configPath=%s", configPath)
+		log.Printf("FindConfigs: Success configPath=%s", configPath)
 		var lines []string
 		if location.Type == syslinux {
 			lines = loadSyslinuxLines(configPath, contents)
@@ -152,9 +153,13 @@ func FindConfigs(mountPath string) []*Config {
 			lines = strings.Split(string(contents), "\n")
 		}
 
+		count++
 		configs = append(configs, ParseConfig(mountPath, configPath, lines))
 	}
 
+	if count == 0 {
+		log.Printf("FindConfigs: Error No configPath found")
+	}
 	return configs
 }
 

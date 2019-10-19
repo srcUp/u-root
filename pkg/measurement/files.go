@@ -6,6 +6,7 @@ import (
 	"github.com/google/go-tpm/tpm2"
 	"github.com/google/go-tpm/tpmutil"
 	// "github.com/TrenchBoot/tpmtool/pkg/tpm"
+	"bytes"
 	"github.com/u-root/u-root/pkg/diskboot"
 	"github.com/u-root/u-root/pkg/mount"
 	"io"
@@ -30,6 +31,44 @@ func NewFileCollector(config []byte) (Collector, error) {
 	return fc, nil
 }
 
+func MeasureCPUIDFile(rwc io.ReadWriter, inputVal string) error {
+	filePath := inputVal
+	d, err := ioutil.ReadFile(filePath)
+	if err == io.EOF {
+		return fmt.Errorf("EOF error")
+	}
+
+	if err != nil {
+		return fmt.Errorf("Error reading target file: filePath=%s, tmpfs(No Mount Operation Needed), inputVal=%s, err=%v",
+			filePath, inputVal, err)
+	}
+
+	oldPCRValue, err := tpm2.ReadPCR(rwc, pcr, tpm2.AlgSHA256)
+	if err != nil {
+		log.Fatal("Can't read PCR %d from the TPM: %s", pcr, err)
+	}
+	log.Printf("File Collector: oldPCRValue = [%x]", oldPCRValue)
+
+	hash := hashSum(d)
+	log.Printf("File Collector: Measured %s, Adding hash=[%x] to PCR #%d", filePath, hash, pcr)
+	if e := tpm2.PCRExtend(rwc, tpmutil.Handle(pcr), tpm2.AlgSHA256, hash, ""); e != nil {
+		return e
+	}
+
+	newPCRValue, err := tpm2.ReadPCR(rwc, pcr, tpm2.AlgSHA256)
+	if err != nil {
+		log.Fatal("Can't read PCR %d from the TPM: %s", pcr, err)
+	}
+
+	log.Printf("File Collector: newPCRValue = [%x]", newPCRValue)
+
+	finalPCR := hashSum(append(oldPCRValue, hash...))
+	if !bytes.Equal(finalPCR, newPCRValue) {
+		log.Fatal("PCRs not equal, got %x, want %x", finalPCR, newPCRValue)
+	}
+	return nil
+}
+
 // measures file input by user in policy file and store in TPM.
 // inputVal is of format <block device identifier>:<path>
 // Example sda:/path/to/file
@@ -40,6 +79,10 @@ func NewFileCollector(config []byte) (Collector, error) {
  */
 func MeasureInputFile(rwc io.ReadWriter, inputVal string) error {
 	s := strings.Split(inputVal, ":")
+	if len(s) == 1 {
+		return MeasureCPUIDFile(rwc, inputVal) // special case
+	}
+
 	if len(s) != 2 {
 		return fmt.Errorf("%s: Usage: <block device identifier>:<path>", inputVal)
 	}
@@ -68,9 +111,31 @@ func MeasureInputFile(rwc io.ReadWriter, inputVal string) error {
 			filePath, dev.MountPath, inputVal, err)
 	}
 
-	hash := hashSum(d)
-	return tpm2.PCRExtend(rwc, tpmutil.Handle(pcr), tpm2.AlgSHA256, hash, "")
+	oldPCRValue, err := tpm2.ReadPCR(rwc, pcr, tpm2.AlgSHA256)
+	if err != nil {
+		log.Fatal("Can't read PCR %d from the TPM: %s", pcr, err)
+	}
+	log.Printf("File Collector: oldPCRValue = [%x]", oldPCRValue)
 
+	hash := hashSum(d)
+	log.Printf("File Collector: Measured %s, path = %s, Adding hash=[%x] to PCR #%d", devicePath, filePath, hash, pcr)
+	if e := tpm2.PCRExtend(rwc, tpmutil.Handle(pcr), tpm2.AlgSHA256, hash, ""); e != nil {
+		return e
+	}
+
+	newPCRValue, err := tpm2.ReadPCR(rwc, pcr, tpm2.AlgSHA256)
+	if err != nil {
+		log.Fatal("Can't read PCR %d from the TPM: %s", pcr, err)
+	}
+
+	log.Printf("File Collector: newPCRValue = [%x]", newPCRValue)
+
+	finalPCR := hashSum(append(oldPCRValue, hash...))
+	if !bytes.Equal(finalPCR, newPCRValue) {
+		log.Fatal("PCRs not equal, got %x, want %x", finalPCR, newPCRValue)
+	}
+
+	return nil
 }
 
 func (s *FileCollector) Collect(rwc io.ReadWriter) error {

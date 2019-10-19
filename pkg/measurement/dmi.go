@@ -152,9 +152,28 @@ func (s *DmiCollector) Collect(rwc io.ReadWriter) error {
 			// For example: for BIOS type(type=0), currently we measure entire output
 			// but in future we could measure individual fields like bios-vendor, bios-version etc.
 
+			oldPCRValue, err := tpm2.ReadPCR(rwc, pcr, tpm2.AlgSHA256)
+			if err != nil {
+				log.Fatal("Can't read PCR %d from the TPM: %s", pcr, err)
+			}
+			log.Printf("DMI Collector: oldPCRValue = [%x]", oldPCRValue)
+
 			hash := hashSum(b.Bytes())
+			log.Printf("DMI Collector: Measured dmi label=%s , Adding hash=[%x] to PCR #%d", label, hash, pcr)
 			if e := tpm2.PCRExtend(rwc, tpmutil.Handle(pcr), tpm2.AlgSHA256, hash, ""); e != nil {
 				return e
+			}
+
+			newPCRValue, err := tpm2.ReadPCR(rwc, pcr, tpm2.AlgSHA256)
+			if err != nil {
+				log.Fatal("Can't read PCR %d from the TPM: %s", pcr, err)
+			}
+
+			log.Printf("DMI Collector: newPCRValue = [%x]", newPCRValue)
+
+			finalPCR := hashSum(append(oldPCRValue, hash...))
+			if !bytes.Equal(finalPCR, newPCRValue) {
+				log.Fatal("PCRs not equal, got %x, want %x", finalPCR, newPCRValue)
 			}
 		}
 	}

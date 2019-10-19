@@ -80,8 +80,30 @@ func MeasureStorageDevice(rwc io.ReadWriter, blkDevicePath string) error {
 		return fmt.Errorf("Empty Disk %s Nothing to measure.\n", blkDevicePath)
 	}
 
+	oldPCRValue, err := tpm2.ReadPCR(rwc, pcr, tpm2.AlgSHA256)
+	if err != nil {
+		log.Fatal("Can't read PCR %d from the TPM: %s", pcr, err)
+	}
+	log.Printf("Storage Collector: oldPCRValue = [%x]", oldPCRValue)
+
 	hash := hashSum(buf.Bytes())
-	return tpm2.PCRExtend(rwc, tpmutil.Handle(pcr), tpm2.AlgSHA256, hash, "")
+	log.Printf("Storage Collector: Measured %s, Adding hash=[%x] to PCR #%d", blkDevicePath, hash, pcr)
+	if e := tpm2.PCRExtend(rwc, tpmutil.Handle(pcr), tpm2.AlgSHA256, hash, ""); e != nil {
+		return e
+	}
+
+	newPCRValue, err := tpm2.ReadPCR(rwc, pcr, tpm2.AlgSHA256)
+	if err != nil {
+		log.Fatal("Can't read PCR %d from the TPM: %s", pcr, err)
+	}
+
+	log.Printf("Storage Collector: newPCRValue = [%x]", newPCRValue)
+
+	finalPCR := hashSum(append(oldPCRValue, hash...))
+	if !bytes.Equal(finalPCR, newPCRValue) {
+		log.Fatal("PCRs not equal, got %x, want %x", finalPCR, newPCRValue)
+	}
+	return nil
 }
 
 func (s *StorageCollector) Collect(rwc io.ReadWriter) error {
