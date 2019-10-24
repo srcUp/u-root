@@ -4,7 +4,7 @@
 
 # upstream u-root uses hiphen in name in source tree.
 Name:           u-root
-Version:        5.0.0	
+Version:        6.0.0	
 Release:        1%{?dist}
 Summary:        u-root initramfs used in UEK secure launch kernel.
 Group:		    Unspecified
@@ -15,7 +15,7 @@ Source1:        %{vendor1}.tar.gz
 Source2:        %{vendor2}.tar.gz
 Source3:        %{vendor3}.tar.gz
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-buildroot
-BuildRequires:  golang git kexec-tools iscsi-initiator-utils cpuid
+BuildRequires:  golang git bash kexec-tools iscsi-initiator-utils cpuid
 
 %define initramfs_name uroot-initramfs.cpio
 %define gopath    %{_builddir}/%{name}-%{version}
