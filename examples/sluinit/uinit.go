@@ -5,11 +5,12 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"os/exec"
 
 	"github.com/TrenchBoot/tpmtool/pkg/tpm"
-	"github.com/TrenchBoot/u-root/pkg/measurement"
+	"github.com/u-root/u-root/pkg/measurement"
 )
 
 type launcher struct {
@@ -35,7 +36,7 @@ type policy struct {
 	DefaultAction string
 	Collectors    []measurement.Collector
 	//Attestor      []attestation.Attestor
-	Launcher      launcher
+	Launcher launcher
 }
 
 func locateSLPolicy() ([]byte, error) {
@@ -45,6 +46,7 @@ func locateSLPolicy() ([]byte, error) {
 	// 	- mount the block device
 	// 	- scan for securelaunch.policy under /, /efi, or /boot
 	// Read in policy file
+	return nil, nil
 }
 
 func parseSLPolicy(pf []byte) (*policy, error) {
@@ -63,7 +65,8 @@ func parseSLPolicy(pf []byte) (*policy, error) {
 	p.DefaultAction = parse.DefaultAction
 
 	for _, c := range parse.Collectors {
-		if collector, err := measurement.GetCollector(c); err != nil {
+		collector, err := measurement.GetCollector(c)
+		if err != nil {
 			return nil, err
 		}
 		p.Collectors = append(p.Collectors, collector)
@@ -87,12 +90,12 @@ func parseSLPolicy(pf []byte) (*policy, error) {
 }
 
 func main() {
-	tpm := tpm.NewTPM()
+	tpm, err := tpm.NewTPM()
 
 	// Request TPM locality 2, requires extending go-tpm for locality request
 
 	rawBytes, err := locateSLPolicy()
-	if err {
+	if err != nil {
 		//need to decide how to bail, reboot, error msg & halt, or
 		//recovery shell
 	}
@@ -101,7 +104,7 @@ func main() {
 	// until DRTM launch is working and able to set locality
 
 	p, err := parseSLPolicy(rawBytes)
-	if err {
+	if err != nil {
 		//need to decide how to bail, reboot, error msg & halt, or
 		//recovery shell
 	}

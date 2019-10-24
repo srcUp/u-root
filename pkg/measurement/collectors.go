@@ -2,6 +2,7 @@ package measurement
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/TrenchBoot/tpmtool/pkg/tpm"
 )
@@ -27,5 +28,5 @@ func GetCollector(config []byte) (Collector, error) {
 		return init(config)
 	}
 
-	return nil, errors.New("unsupported collector %s", header.Type)
+	return nil, fmt.Errorf("unsupported collector %s", header.Type)
 }
