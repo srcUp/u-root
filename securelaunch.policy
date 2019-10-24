@@ -1,0 +1,43 @@
+{
+    "default_action": "",
+    "collectors": [
+      {
+        "type": "dmi",
+        "events": [
+          {
+            "label": "BIOS",
+            "fields": []
+          },
+          {
+            "label": "System",
+            "fields": []
+          },
+          {
+            "label": "Processor",
+            "fields": []
+          }
+        ]
+      },
+      {
+        "type": "files",
+        "paths": [ "sda1:/hello.go" ]
+      },
+      {
+        "type": "storage",
+        "paths": [ "/dev/sda1", "/dev/sda3" ]
+      },
+      {
+        "type": "storage",
+        "paths": [ "/dev/sda2" ]
+      }
+    ],
+    "attestor": {},
+    "launcher": {
+        "type": "kexec",
+        "params": {
+            "initrd":"sdc1:/boot/initramfs-4.14.35-1923.el7uek.x86_64.img",
+            "cmdline":"console=ttyS0 BOOT_IMAGE=/vmlinuz-4.14.35-1923.el7uek.x86_64 root=/dev/mapper/ol-root ro crashkernel=auto rd.lvm.lv=ol/root rd.lvm.lv=ol/swap rhgb numa=off transparent_hugepage=never LANG=en_US.UTF-8",
+            "kernel":"sdc1:/boot/vmlinuz-4.14.35-1923.el7uek.x86_64"
+         }
+    }
+}
