@@ -1,7 +1,3 @@
-%global vendor1     TrenchBoot
-%global vendor2     digitalocean
-%global vendor3     google
-
 # upstream u-root uses hiphen in name in source tree.
 Name:           u-root
 Version:        6.0.0	
@@ -11,9 +7,6 @@ Group:		    Unspecified
 License:        BSD 3-Clause License 
 URL:		    http://u-root.tk/
 Source0:        %{name}-%{version}.tar.gz
-Source1:        %{vendor1}.tar.gz
-Source2:        %{vendor2}.tar.gz
-Source3:        %{vendor3}.tar.gz
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-buildroot
 BuildRequires:  golang git bash kexec-tools iscsi-initiator-utils cpuid
 
@@ -24,7 +17,6 @@ BuildRequires:  golang git bash kexec-tools iscsi-initiator-utils cpuid
 u-root("universal root") creates an embeddable root file system intended to be used as initramfs in UEK secure launch kernel.
 
 %prep
-%setup -c -n %{name}-%{version}/src/github.com/ -q -T -a 1 -a 2 -a 3
 %setup -c -n %{name}-%{version}/src/github.com/u-root -q -D
 
 %build
