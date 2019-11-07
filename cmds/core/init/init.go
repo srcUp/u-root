@@ -84,6 +84,10 @@ func main() {
 		// initos need their own pid space.
 		libinit.Command("/inito", libinit.WithCloneFlags(syscall.CLONE_NEWPID), ctty),
 
+		libinit.Command("/bbin/sluinit", ctty, uinitArgs),
+		libinit.Command("/bin/sluinit", ctty, uinitArgs),
+		libinit.Command("/buildbin/sluinit", ctty, uinitArgs),
+
 		libinit.Command("/bbin/uinit", ctty, uinitArgs),
 		libinit.Command("/bin/uinit", ctty, uinitArgs),
 		libinit.Command("/buildbin/uinit", ctty, uinitArgs),
