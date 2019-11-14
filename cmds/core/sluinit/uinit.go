@@ -612,9 +612,20 @@ func init() {
 		log.Printf("Output: \n%v", cmd2.Stdout)
 	}
 
+	cmd3 := exec.Command("tpmtool", "-log", "/sys/kernel/security/slaunch/eventlog", "-tpm20")
+	var out3 bytes.Buffer
+	cmd3.Stdout = &out3
+	log.Printf("Executing %v", cmd3.Args)
+	if err3 := cmd3.Run(); err != nil {
+		fmt.Println(err3)
+	} else {
+		log.Printf("Output: \n%v", cmd3.Stdout)
+	}
+
 	s := "sleeping, press CTRL C if u like"
 	for i := 0; i < 5; i++ {
 		time.Sleep(5 * time.Second)
 		fmt.Println(s)
 	}
+
 }
