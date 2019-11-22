@@ -282,7 +282,6 @@ func parseSLPolicy(pf []byte) (*policy, error) {
 }
 
 func main() {
-
 	log.Printf("********Step 1: init completed. starting main ********\n")
 	tpm2, err := tpm2.OpenTPM("/dev/tpm0")
 	if err != nil {
@@ -594,32 +593,38 @@ func init() {
 
 	cmd1 := exec.Command("ls", "/sys/class/net")
 	var out1 bytes.Buffer
+	var stderr1 bytes.Buffer
 	cmd1.Stdout = &out1
+	cmd1.Stderr = &stderr1
 	log.Printf("Executing %v", cmd1.Args)
 	if err1 := cmd1.Run(); err1 != nil {
-		fmt.Println(err1)
+		fmt.Println(fmt.Sprint(err1) + ": " + stderr1.String())
 	} else {
-		log.Printf("Output: \n%v", cmd1.Stdout)
+		log.Println("Output: " + out1.String())
 	}
 
 	cmd2 := exec.Command("ls", "/sys/class/block")
 	var out2 bytes.Buffer
+	var stderr2 bytes.Buffer
 	cmd2.Stdout = &out2
+	cmd2.Stderr = &stderr2
 	log.Printf("Executing %v", cmd2.Args)
 	if err2 := cmd2.Run(); err2 != nil {
-		fmt.Println(err2)
+		fmt.Println(fmt.Sprint(err2) + ": " + stderr2.String())
 	} else {
-		log.Printf("Output: \n%v", cmd2.Stdout)
+		log.Println("Output: " + out2.String())
 	}
 
 	cmd3 := exec.Command("tpmtool", "-log", "/sys/kernel/security/slaunch/eventlog", "-tpm20")
 	var out3 bytes.Buffer
+	var stderr3 bytes.Buffer
 	cmd3.Stdout = &out3
+	cmd3.Stderr = &stderr3
 	log.Printf("Executing %v", cmd3.Args)
 	if err3 := cmd3.Run(); err != nil {
-		fmt.Println(err3)
+		fmt.Println(fmt.Sprint(err3) + ": " + stderr3.String())
 	} else {
-		log.Printf("Output: \n%v", cmd3.Stdout)
+		log.Println("Output: " + out3.String())
 	}
 
 	s := "sleeping, press CTRL C if u like"
@@ -627,5 +632,4 @@ func init() {
 		time.Sleep(5 * time.Second)
 		fmt.Println(s)
 	}
-
 }

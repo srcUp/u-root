@@ -340,17 +340,6 @@
   revision = "8ea48ab5b46d5f65e0327d8b9c485c4f05890b29"
 
 [[projects]]
-  digest = "1:b32159514d49878a65178397072cea7fd26a7ceaa091d807dd41b3056789b0b6"
-  name = "github.com/systemboot/tpmtool"
-  packages = [
-    "pkg/tpm",
-    "pkg/tpmtool",
-  ]
-  pruneopts = "NUT"
-  revision = "304bb9ad19f03ad69bad1dff43103730558233b6"
-  version = "v3"
-
-[[projects]]
   branch = "master"
   digest = "1:d22079e80e2b0063d47752b22196eb700e6248c6f66022e8d9b36dd614604b66"
   name = "github.com/vishvananda/netlink"
@@ -516,6 +505,7 @@
     "github.com/insomniacslk/dhcp/interfaces",
     "github.com/insomniacslk/dhcp/netboot",
     "github.com/klauspost/pgzip",
+    "github.com/koding/multiconfig",
     "github.com/kr/pty",
     "github.com/mattn/go-isatty",
     "github.com/nsf/termbox-go",
@@ -526,8 +516,6 @@
     "github.com/stretchr/testify/assert",
     "github.com/stretchr/testify/require",
     "github.com/systemboot/systemboot/pkg/storage",
-    "github.com/systemboot/tpmtool/pkg/tpm",
-    "github.com/systemboot/tpmtool/pkg/tpmtool",
     "github.com/vishvananda/netlink",
     "golang.org/x/crypto/ed25519",
     "golang.org/x/crypto/md4",

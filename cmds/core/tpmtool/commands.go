@@ -12,8 +12,10 @@ import (
 	"time"
 
 	"github.com/systemboot/systemboot/pkg/storage"
-	"github.com/systemboot/tpmtool/pkg/tpm"
-	"github.com/systemboot/tpmtool/pkg/tpmtool"
+	"github.com/u-root/u-root/pkg/tpmtool-pcrlog/pkg/tpm"
+	"github.com/u-root/u-root/pkg/tpmtool-pcrlog/pkg/tpmtool"
+	// "github.com/systemboot/tpmtool/pkg/tpm"
+	// "github.com/systemboot/tpmtool/pkg/tpmtool"
 )
 
 const (

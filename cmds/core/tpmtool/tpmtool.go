@@ -4,7 +4,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/systemboot/tpmtool/pkg/tpm"
+	"github.com/u-root/u-root/pkg/tpmtool-pcrlog/pkg/tpm"
+	// "github.com/systemboot/tpmtool/pkg/tpm"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
@@ -108,9 +109,11 @@ func main() {
 	kingpin.CommandLine.Help = HelpText
 
 	if *tpmDevice != "" {
+		log.Println("tpmdevice=%s", *tpmDevice)
 		tpm.TPMDevice = *tpmDevice
 	}
 
+	log.Println("tpmdevice=%v", *tpmDevice)
 	// Check for root user
 	file, err := os.Open(tpm.TPMDevice)
 	if err != nil {
@@ -120,7 +123,7 @@ func main() {
 
 	TPMInterface, err = tpm.NewTPM()
 	if err != nil {
-		log.Fatal("Can't open TPM interface: " + err.Error())
+		log.Fatal("Yahoo...Can't open TPM interface: " + err.Error())
 	}
 	defer TPMInterface.Close()
 
