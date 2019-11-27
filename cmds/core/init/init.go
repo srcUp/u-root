@@ -88,9 +88,9 @@ func main() {
 		libinit.Command("/bin/sluinit", ctty, uinitArgs),
 		libinit.Command("/buildbin/sluinit", ctty, uinitArgs),
 
-		// libinit.Command("/bbin/uinit", ctty, uinitArgs),
-		// libinit.Command("/bin/uinit", ctty, uinitArgs),
-		// libinit.Command("/buildbin/uinit", ctty, uinitArgs),
+		//libinit.Command("/bbin/uinit", ctty, uinitArgs),
+		//libinit.Command("/bin/uinit", ctty, uinitArgs),
+		//libinit.Command("/buildbin/uinit", ctty, uinitArgs),
 
 		libinit.Command("/bin/defaultsh", ctty),
 		libinit.Command("/bin/sh", ctty),

@@ -23,7 +23,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"time"
+	// "time"
 )
 
 type launcher struct {
@@ -126,6 +126,81 @@ type policy struct {
 	Launcher      launcher
 }
 
+// https://stackoverflow.com/questions/10510691/how-to-check-whether-a-file-or-directory-exists
+// exists returns whether the given file or directory exists
+func exists(path string) (bool, error) {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return true, err
+}
+
+func writeSrcFiletoDst(src, dst string) (bool, error) {
+	FileFound, err := exists(src)
+	if !FileFound {
+		return true, fmt.Errorf("File to be written doesnt exist: \n")
+	}
+
+	d, err := ioutil.ReadFile(src)
+	if err != nil {
+		return true, fmt.Errorf("Error reading src file %s, err=%v", src, err)
+	}
+
+	bootDeviceFound, err := exists(dst)
+	if !bootDeviceFound {
+		return false, fmt.Errorf("This device doesnt contain boot parition\n")
+	}
+
+	dst_file := dst + "eventlog"
+	err = ioutil.WriteFile(dst_file, d, 0644)
+	if err != nil {
+		return true, fmt.Errorf("Could't write file to %s, err=%v", dst_file, err)
+	}
+	log.Printf("writeSrcFiletoDst exiting, no error")
+	return false, nil
+}
+
+func writeFileToBootPartition() error {
+	log.Printf("Searching and mounting block devices with bootable configs\n")
+	blkDevices := diskboot.FindDevicesRW("/sys/class/block/*") // FindDevices find and *mounts* the devices as rw,user.
+	if len(blkDevices) == 0 {
+		return errors.New("No block devices found")
+	}
+
+	for _, device := range blkDevices {
+		devicePath, mountPath := device.DevPath, device.MountPath
+		log.Printf("Finding device with boot parition under devicePath=%s, mountPath=%s\n", devicePath, mountPath)
+		src := "/sys/kernel/security/slaunch/eventlog"
+		// src := "/eventlog_ross"
+		// dst := mountPath + "/boot"
+		dst := mountPath + "/"
+		fatal, err := writeSrcFiletoDst(src, dst)
+		if e := mount.Unmount(mountPath, true, false); e != nil {
+			log.Printf("Unmount failed. PANIC\n")
+			panic(e)
+		}
+
+		if fatal {
+			// fatal error means source file doesn't exist. no point trying other devices.
+			return fmt.Errorf("writeSrcFiletoDst returned fatal error err=%v, exiting", err)
+		}
+
+		if err != nil {
+			log.Printf("writeSrcFiletoDst returned non fatal error err=%v, continuing to next device\n", err)
+			continue
+		}
+
+		log.Printf("writeSrcFiletoDst successful: src=%s, dst=%s", src, dst)
+		return nil
+	}
+
+	return fmt.Errorf("writeFileToBootPartition failed")
+}
+
 /* 	scanKernelCmdLine() ([]byte, error)
 	format sl_policy=<block device identifier>:<path>
 	e.g 1 sda:/boot/securelaunch.policy
@@ -198,6 +273,7 @@ func scanBlockDevice(mountPath string) ([]byte, bool) {
 				log.Printf("Error reading policy file %s, continuing", o.Name)
 				continue
 			}
+			log.Printf("policy file found on mountPath=%s, directory =%s\n", mountPath, c)
 			return d, true // return when first policy file found
 		}
 		// Policy File not found. Moving on to next search root...
@@ -330,6 +406,12 @@ func main() {
 		c.Collect(tpm2)
 	}
 	log.Printf("Collectors completed\n")
+
+	log.Printf("********Step 5: Write eventlog to /boot partition*********\n")
+	if e := writeFileToBootPartition(); e != nil {
+		log.Printf("write eventlog File To Boot Partition failed err=%v", e)
+		return
+	}
 
 	log.Printf("********Step 5: Launcher called ********\n")
 	p.Launcher.Boot(tpm2)
@@ -612,7 +694,7 @@ func init() {
 		log.Printf("Output: \n%v", cmd2.Stdout)
 	}
 
-	cmd3 := exec.Command("tpmtool", "eventlog", "dump", "--tpm20", "/sys/kernel/security/slaunch/eventlog")
+	cmd3 := exec.Command("tpmtool", "eventlog", "dump", "--txt", "--tpm20", "/sys/kernel/security/slaunch/eventlog")
 	var out3 bytes.Buffer
 	cmd3.Stdout = &out3
 	log.Printf("Executing %v", cmd3.Args)
@@ -621,10 +703,10 @@ func init() {
 	} else {
 		log.Printf("Output: \n%v", cmd3.Stdout)
 	}
-
-	s := "sleeping, press CTRL C if u like"
-	for i := 0; i < 5; i++ {
-		time.Sleep(5 * time.Second)
-		fmt.Println(s)
-	}
+	/*
+	   s := "sleeping, press CTRL C if u like"
+	   for i := 0; i < 5; i++ {
+	       time.Sleep(5 * time.Second)
+	       fmt.Println(s)
+	   } */
 }

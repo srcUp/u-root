@@ -106,13 +106,16 @@ func main() {
 	var data []string
 	var err error
 	for _, option := range options {
+		// log.Printf("option=%v\n", option)
 		switch option {
 		case "loop":
+			// log.Printf("case loop")
 			dev, err = loopSetup(dev)
 			if err != nil {
 				log.Fatal("Error setting loop device:", err)
 			}
 		default:
+			// log.Printf("case default")
 			if f, ok := opts[option]; ok {
 				flags |= f
 			} else {
@@ -121,12 +124,16 @@ func main() {
 		}
 	}
 	if *ro {
+		// log.Printf("read only set")
 		flags |= unix.MS_RDONLY
 	}
 	if *fsType == "" {
 		// mandatory parameter for the moment
 		log.Fatalf("No file system type provided!\nUsage: mount [-r] [-o mount options] -t fstype dev path")
 	}
+
+	// log.Printf("data=%v\n", data)
+	// log.Printf("flags=%v\n", flags)
 	if err := mount.Mount(dev, path, *fsType, strings.Join(data, ","), flags); err != nil {
 		log.Printf("%v", err)
 		informIfUnknownFS(*fsType)
