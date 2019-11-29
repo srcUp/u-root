@@ -16,6 +16,7 @@ import (
 	"github.com/u-root/u-root/pkg/find"
 	"github.com/u-root/u-root/pkg/measurement"
 	"github.com/u-root/u-root/pkg/mount"
+	"github.com/u-root/u-root/pkg/storage"
 	"io"
 	"io/ioutil"
 	"log"
@@ -25,6 +26,8 @@ import (
 	"strings"
 	// "time"
 )
+
+var storageBlkDevices []storage.BlockDev
 
 type launcher struct {
 	Type string `json:"type"`
@@ -53,7 +56,18 @@ func GetMountedFilePath(inputVal string, rw_option bool) (string, string, error)
 		return "", "", fmt.Errorf("%s: Usage: <block device identifier>:<path>", inputVal)
 	}
 
-	devicePath := filepath.Join("/dev", s[0]) // assumes deviceId is sda, devicePath=/dev/sda
+	// s[0] can be sda or UUID. if UUID, then we need to find its name
+	var deviceId string = s[0]
+	if !strings.HasPrefix(deviceId, "sd") {
+		devices := storage.PartitionsByFsUUID(storageBlkDevices, s[0]) // []BlockDev
+		for _, device := range devices {
+			log.Printf("device =%s with fsuuid=%s", device.Name, s[0])
+			deviceId = device.Name
+		}
+	}
+
+	devicePath := filepath.Join("/dev", deviceId) // assumes deviceId is sda, devicePath=/dev/sda
+	log.Printf("Attempting to mount %s", devicePath)
 	var dev *diskboot.Device
 	var err error
 	if rw_option {
@@ -764,6 +778,15 @@ func init() {
 	} else {
 		log.Printf("Output: %v", cmd2.Stdout)
 	}
+
+	storageBlkDevices, err = storage.GetBlockStats()
+	if err != nil {
+		log.Printf("ERR: Couldn't get info on block devices. Exiting")
+		return
+	}
+	//for k, d := range storageBlkDevices {
+	//	log.Printf("summary of block device #%d=%s", k, d.Summary())
+	//}
 
 	cmd3 := exec.Command("tpmtool", "eventlog", "dump", "--txt", "--tpm12", "/eventlog_ross > /tmp/parsedEvtLog.txt")
 	// cmd3 := exec.Command("tpmtool", "eventlog", "dump", "--txt", "--tpm20", "/sys/kernel/security/slaunch/eventlog > /tmp/parsedEvtLog.txt")
