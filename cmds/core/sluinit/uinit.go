@@ -279,25 +279,22 @@ func scanKernelCmdLine() ([]byte, error) {
 		return nil, errors.New("Flag Not Set")
 	}
 
-	s := strings.Split(val, ":")
-	if len(s) != 2 {
-		return nil, fmt.Errorf("%v: incorrect format. Usage: sl_policy=<block device identifier>:<path>", val)
+	// val is of type sda:path
+	mntFilePath, mountPath, e := GetMountedFilePath(val, false) // false means readonly mount
+	if e != nil {
+		log.Printf("scanKernelCmdLine: GetMountedFilePath err=%v", e)
+	}
+	log.Printf("scanKernelCmdLine: Reading file=%s", mntFilePath)
+
+	d, err := ioutil.ReadFile(mntFilePath)
+	if e := mount.Unmount(mountPath, true, false); e != nil {
+		log.Printf("Unmount failed. PANIC")
+		panic(e)
 	}
 
-	log.Printf("sl_policy flag is set with val=%s", val)
-	devicePath := filepath.Join("/dev", s[0]) // assumes deviceId is sda, devicePath=/dev/sda
-	log.Printf("devicePath=%v", devicePath)
-	dev, err := diskboot.FindDevice(devicePath) // FindDevice fn mounts devicePath=/dev/sda.
-	if err != nil {
-		return nil, err
-	}
-
-	mountPath := dev.MountPath + s[1] // mountPath=/tmp/slaunch.policy if /dev/sda mounted on /tmp
-	log.Printf("Reading file=%s", mountPath)
-	d, err := ioutil.ReadFile(mountPath)
 	if err != nil {
 		// - TODO: should we check for end of file ?
-		return nil, fmt.Errorf("Error reading policy file found at mountPath=%s, devicePath=%s, passed=%s", mountPath, devicePath, val)
+		return nil, fmt.Errorf("Error reading policy file:mountPath=%s, passed=%s\n", mntFilePath, val)
 	}
 	return d, nil
 }
