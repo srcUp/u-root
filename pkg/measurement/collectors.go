@@ -13,7 +13,8 @@ type Collector interface {
 }
 
 const (
-	pcr             = int(16)
+	// pcr             = int(16)
+	pcr             = int(22)
 	pcrIndex uint32 = 23
 )
 
