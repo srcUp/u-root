@@ -13,6 +13,7 @@ import (
 	"github.com/u-root/u-root/pkg/diskboot"
 	"github.com/u-root/u-root/pkg/find"
 	"github.com/u-root/u-root/pkg/mount"
+	"github.com/u-root/u-root/pkg/storage"
 	"io/ioutil"
 	"log"
 	"os"
@@ -21,6 +22,8 @@ import (
 	"strings"
 	// "time"
 )
+
+var storageBlkDevices []storage.BlockDev
 
 // Caller's responsbility to unmount this..use mountPath returned to unmount.
 // obtains file path based on input entered by user in policy file.
@@ -38,7 +41,18 @@ func GetMountedFilePath(inputVal string, rw_option bool) (string, string, error)
 		return "", "", fmt.Errorf("%s: Usage: <block device identifier>:<path>", inputVal)
 	}
 
-	devicePath := filepath.Join("/dev", s[0]) // assumes deviceId is sda, devicePath=/dev/sda
+	// s[0] can be sda or UUID. if UUID, then we need to find its name
+	var deviceId string = s[0]
+	if !strings.HasPrefix(deviceId, "sd") {
+		devices := storage.PartitionsByFsUUID(storageBlkDevices, s[0]) // []BlockDev
+		for _, device := range devices {
+			log.Printf("device =%s with fsuuid=%s", device.Name, s[0])
+			deviceId = device.Name
+		}
+	}
+
+	devicePath := filepath.Join("/dev", deviceId) // assumes deviceId is sda, devicePath=/dev/sda
+	log.Printf("Attempting to mount %s", devicePath)
 	var dev *diskboot.Device
 	var err error
 	if rw_option {
@@ -51,6 +65,7 @@ func GetMountedFilePath(inputVal string, rw_option bool) (string, string, error)
 		return "", "", err
 	}
 
+	log.Printf("Mounted %s", devicePath)
 	filePath := dev.MountPath + s[1] // mountPath=/tmp/path/to/target/file if /dev/sda mounted on /tmp
 	return filePath, dev.MountPath, nil
 }
@@ -143,7 +158,7 @@ func scanKernelCmdLine() ([]byte, error) {
 	// val is of type sda:path
 	mntFilePath, mountPath, e := GetMountedFilePath(val, false) // false means readonly mount
 	if e != nil {
-		return fmt.Errorf("scanKernelCmdLine: GetMountedFilePath err=%v", e)
+		return nil, fmt.Errorf("scanKernelCmdLine: GetMountedFilePath err=%v", e)
 	}
 	log.Printf("scanKernelCmdLine: Reading file=%s", mntFilePath)
 
@@ -277,4 +292,16 @@ func Cmd_exec(cmdname string, cmdArgs []string) {
 	} else {
 		log.Printf("Output: \n%v", cmd.Stdout)
 	}
+}
+
+func init() {
+	var err error
+	storageBlkDevices, err = storage.GetBlockStats()
+	if err != nil {
+		log.Printf("ERR: Couldn't get info on block devices. Exiting")
+		return
+	}
+	//for k, d := range storageBlkDevices {
+	//	log.Printf("summary of block device #%d=%s", k, d.Summary())
+	//}
 }
