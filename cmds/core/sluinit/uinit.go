@@ -32,71 +32,138 @@ type launcher struct {
 	Params map[string]string `json:"params"`
 }
 
+type eventlog struct {
+	Type     string `json:"type"`
+	Location string `json:"location"`
+}
+
+// Caller's responsbility to unmount this..use mountPath returned to unmount.
 // obtains file path based on input entered by user in policy file.
 // inputVal is of format <block device identifier>:<path>
+// rw_option = true --> mount is read write type
 // Example sda:/path/to/file
 /* - mount device
  * - Get file Path on mounted device.
- * - Unmount device
+ * - does NOT Unmount device, use returned devicePath to unmount...
+ * returns filePath, mountPath, error in that order
  */
-func GetMountedFilePath(inputVal string) (string, error) {
+func GetMountedFilePath(inputVal string, rw_option bool) (string, string, error) {
 	s := strings.Split(inputVal, ":")
 	if len(s) != 2 {
-		return "", fmt.Errorf("%s: Usage: <block device identifier>:<path>\n", inputVal)
+		return "", "", fmt.Errorf("%s: Usage: <block device identifier>:<path>", inputVal)
 	}
 
-	devicePath := filepath.Join("/dev", s[0])   // assumes deviceId is sda, devicePath=/dev/sda
-	dev, err := diskboot.FindDevice(devicePath) // FindDevice fn mounts devicePath=/dev/sda.
+	devicePath := filepath.Join("/dev", s[0]) // assumes deviceId is sda, devicePath=/dev/sda
+	var dev *diskboot.Device
+	var err error
+	if rw_option {
+		dev, err = diskboot.FindDeviceRW(devicePath) // FindDevice fn mounts , w rw option, devicePath=/dev/sda.
+	} else {
+		dev, err = diskboot.FindDevice(devicePath) // FindDevice fn mounts devicePath=/dev/sda.
+	}
 	if err != nil {
-		fmt.Printf("Mount %v failed, err=%v\n", devicePath, err)
-		return "", err
+		log.Printf("Mount %v failed, err=%v", devicePath, err)
+		return "", "", err
 	}
 
 	filePath := dev.MountPath + s[1] // mountPath=/tmp/path/to/target/file if /dev/sda mounted on /tmp
-	return filePath, nil
+	return filePath, dev.MountPath, nil
+}
+
+// /tmp/parsedEvtLog.txt --> written to --> eventlog_path
+func (e *eventlog) Persist() error {
+
+	if e.Type != "file" {
+		return fmt.Errorf("EventLog: Unsupported eventlog type. Exiting.")
+	}
+
+	log.Printf("Identified EventLog Type = file")
+
+	// e.Location is of the form sda:path/to/file.txt
+	eventlog_path := e.Location
+	if eventlog_path == "" {
+		return fmt.Errorf("EventLog: Empty eventlog path. Exiting.")
+	}
+
+	filePath, mountPath, r := GetMountedFilePath(eventlog_path, true) // true = rw mount option
+	if r != nil {
+		return fmt.Errorf("EventLog: ERR: eventlog input %s couldnt be located, err=%v", eventlog_path, r)
+	}
+
+	dst := filePath // /tmp/boot-733276578/evtlog
+	src1 := "/tmp/parsedEvtLog.txt"
+	src2 := "/tmp/cpuid.txt"
+	default1_fname := "eventlog.txt"
+	default2_fname := "cpuid.txt"
+
+	target1, err1 := writeSrcFiletoDst(src1, dst, default1_fname)
+	target2, err2 := writeSrcFiletoDst(src2, filepath.Dir(dst)+"/", default2_fname)
+	if ret := mount.Unmount(mountPath, true, false); ret != nil {
+		log.Printf("Unmount failed. PANIC")
+		panic(ret)
+	}
+
+	if err1 == nil && err2 == nil {
+		log.Printf("writeSrcFiletoDst successful: src1=%s, src2=%s, dst1=%s, dst2=%s", src1, src2, target1, target2)
+		return nil
+	}
+
+	if err1 != nil {
+		// return fmt.Errorf("writeSrcFiletoDst: src1 returned errors err1=%v, src1=%s, dst1=%s, exiting", err1, src1, dst)
+		log.Printf("writeSrcFiletoDst: src1 returned errors err1=%v, src1=%s, dst1=%s, exiting", err1, src1, dst)
+	}
+
+	if err2 != nil {
+		// return fmt.Errorf("writeSrcFiletoDst src2 returned errors err2=%v, src2=%s, dst2=%s", err2, src2, filepath.Dir(dst)+default2_fname)
+		log.Printf("writeSrcFiletoDst src2 returned errors err2=%v, src2=%s, dst2=%s", err2, src2, filepath.Dir(dst)+default2_fname)
+	}
+
+	return nil
 }
 
 func (l *launcher) Boot(t io.ReadWriter) {
 
 	if l.Type != "kexec" {
-		log.Printf("Launcher: Unsupported launcher type. Exiting.\n")
+		log.Printf("Launcher: Unsupported launcher type. Exiting.")
 		return
 	}
-	log.Printf("Identified Launcher Type = Kexec\n")
+	log.Printf("Identified Launcher Type = Kexec")
 	// TODO: if kernel and initrd are on different devices.
 	kernel := l.Params["kernel"]
 	initrd := l.Params["initrd"]
 	cmdline := l.Params["cmdline"]
 
-	log.Printf("********Step 6: Measuring kernel, initrd ********\n")
+	log.Printf("********Step 6: Measuring kernel, initrd ********")
 	if e := measurement.MeasureInputFile(t, kernel); e != nil {
-		log.Printf("Launcher: ERR: measure kernel input=%s, err=%v\n", kernel, e)
+		log.Printf("Launcher: ERR: measure kernel input=%s, err=%v", kernel, e)
 		return
 	}
 
 	if e := measurement.MeasureInputFile(t, initrd); e != nil {
-		log.Printf("Launcher: ERR: measure initrd input=%s, err=%v\n", initrd, e)
+		log.Printf("Launcher: ERR: measure initrd input=%s, err=%v", initrd, e)
 		return
 	}
 
-	k, e := GetMountedFilePath(kernel)
+	// I don't unmount the mount path ?
+	k, _, e := GetMountedFilePath(kernel, false) // false=read only mount option
 	if e != nil {
-		log.Printf("Launcher: ERR: kernel input %s couldnt be located, err=%v\n", kernel, e)
+		log.Printf("Launcher: ERR: kernel input %s couldnt be located, err=%v", kernel, e)
 		return
 	}
 
-	i, e := GetMountedFilePath(initrd)
+	// I don't unmount the mount path ?
+	i, _, e := GetMountedFilePath(initrd, false) // false=read only mount option
 	if e != nil {
-		log.Printf("Launcher: ERR: initrd input %s couldnt be located, err=%v\n", initrd, e)
+		log.Printf("Launcher: ERR: initrd input %s couldnt be located, err=%v", initrd, e)
 		return
 	}
 
-	log.Printf("********Step 7: kexec called  ********\n")
+	log.Printf("********Step 7: kexec called  ********")
 	//i := "initramfs-4.14.35-builtin-no-embedded+.img"
 	//k := "vmlinuz-4.14.35-builtin-no-embedded-signed+"
 	//cmdline := "console=ttyS0,115200n8 BOOT_IMAGE=/vmlinuz-4.14.35-builtin-no-embedded-signed+ root=/dev/mapper/ol-root ro crashkernel=auto netroot=iscsi:@10.196.210.62::3260::iqn.1986-03.com.sun:ovs112-boot rd.iscsi.initiator=iqn.1988-12.com.oracle:ovs112 netroot=iscsi:@10.196.210.64::3260::iqn.1986-03.com.sun:ovs112-boot rd.lvm.lv=ol/root rd.lvm.lv=ol/swap  numa=off transparent_hugepage=never LANG=en_US.UTF-8"
 
-	// log.Printf("running command : kexec -s --initrd %s --command-line %s kernel=[%s]\n", i, cmdline, k)
+	// log.Printf("running command : kexec -s --initrd %s --command-line %s kernel=[%s]", i, cmdline, k)
 	boot := exec.Command("kexec", "-l", "-s", "--initrd", i, "--command-line", cmdline, k)
 
 	// boot := exec.Command("kexec", "-s", "-i", i, "-l", k, "-c", cmdline) /* this is u-root's kexec */
@@ -107,7 +174,7 @@ func (l *launcher) Boot(t io.ReadWriter) {
 	if err := boot.Run(); err != nil {
 		//need to decide how to bail, reboot, error msg & halt, or
 		//recovery shell
-		log.Printf("command finished with error: %v\n", err)
+		log.Printf("command finished with error: %v", err)
 		os.Exit(1)
 	}
 	//sudo sync; sudo umount -a; sudo kexec -e
@@ -115,7 +182,7 @@ func (l *launcher) Boot(t io.ReadWriter) {
 	if err := boot.Run(); err != nil {
 		//need to decide how to bail, reboot, error msg & halt, or
 		//recovery shell
-		log.Printf("command finished with error: %v\n", err)
+		log.Printf("command finished with error: %v", err)
 		os.Exit(1)
 	}
 }
@@ -124,81 +191,78 @@ type policy struct {
 	DefaultAction string
 	Collectors    []measurement.Collector
 	Launcher      launcher
+	EventLog      eventlog
 }
 
 // https://stackoverflow.com/questions/10510691/how-to-check-whether-a-file-or-directory-exists
 // exists returns whether the given file or directory exists
-func exists(path string) (bool, error) {
-	_, err := os.Stat(path)
+// also returns if the path is a directory
+func exists(path string) (bool, bool, error) {
+	fileInfo, err := os.Stat(path)
 	if err == nil {
-		return true, nil
+		return true, fileInfo.IsDir(), nil
 	}
 	if os.IsNotExist(err) {
-		return false, nil
+		return false, false, nil
 	}
-	return true, err
+	// file or dir def exists..
+	return true, fileInfo.IsDir(), err
 }
 
-func writeSrcFiletoDst(src, dst string) (bool, error) {
-	FileFound, err := exists(src)
-	if !FileFound {
-		return true, fmt.Errorf("File to be written doesnt exist: \n")
+// src and dst are already mounted file paths.
+// src := Absolute source file path
+// dst := Absolute destination file path
+// defFileName := default file name, only used if user doesn't provide one.
+// returns the target file path where file was written..
+func writeSrcFiletoDst(src, dst, defFileName string) (string, error) {
+	srcFileFound, _, err := exists(src)
+	if !srcFileFound {
+		return "", fmt.Errorf("File to be written doesnt exist:")
 	}
 
 	d, err := ioutil.ReadFile(src)
 	if err != nil {
-		return true, fmt.Errorf("Error reading src file %s, err=%v", src, err)
+		return "", fmt.Errorf("Error reading src file %s, err=%v", src, err)
 	}
 
-	bootDeviceFound, err := exists(dst)
-	if !bootDeviceFound {
-		return false, fmt.Errorf("This device doesnt contain boot parition\n")
+	// make sure dst is an absolute file path
+	if !filepath.IsAbs(dst) {
+		return "", fmt.Errorf("Error: dst =%s Not an absolute path ", dst)
 	}
 
-	dst_file := dst + "eventlog"
-	err = ioutil.WriteFile(dst_file, d, 0644)
+	// target is the full absolute path where thesrc will be written to
+	target := dst
+
+	/*dst = /foo/bar/eventlog, check if /foo/bar/eventlog is a dir or file that exists..
+		 *if it exists as a file, this if loop is untouched.
+	     *if it exists as a dir, append defaul file name to it
+		 *NOT both dst = /foo/bar/ and dst=/foo/bar are considered dirs i.e. trailing "/" has no meaning..
+	*/
+	dstFound, is_dir, err := exists(dst)
+	if is_dir {
+		if !dstFound {
+			return "", fmt.Errorf("destination dir doesn't")
+		} else {
+			log.Printf("No file name provided. Adding it here.old target=%s", target)
+			// no file name was provided. Use default.
+			// check if defFileName doesn't have a trailing "/"
+			if strings.HasPrefix(defFileName, "/") || strings.HasSuffix(dst, "/") {
+				target = dst + defFileName
+			} else {
+				log.Printf("I need to construct filepath. ERROR: Pass dir w suffix=/ or fname w prefix=/")
+				return "", fmt.Errorf("Pass dir w suffix=/ or fname w prefix=/")
+			}
+			log.Printf("New target=%s", target)
+		}
+	}
+
+	log.Printf("target=%s", target)
+	err = ioutil.WriteFile(target, d, 0644)
 	if err != nil {
-		return true, fmt.Errorf("Could't write file to %s, err=%v", dst_file, err)
+		return "", fmt.Errorf("Could't write file to %s, err=%v", target, err)
 	}
-	log.Printf("writeSrcFiletoDst exiting, no error")
-	return false, nil
-}
-
-func writeFileToBootPartition() error {
-	log.Printf("Searching and mounting block devices with bootable configs\n")
-	blkDevices := diskboot.FindDevicesRW("/sys/class/block/*") // FindDevices find and *mounts* the devices as rw,user.
-	if len(blkDevices) == 0 {
-		return errors.New("No block devices found")
-	}
-
-	for _, device := range blkDevices {
-		devicePath, mountPath := device.DevPath, device.MountPath
-		log.Printf("Finding device with boot parition under devicePath=%s, mountPath=%s\n", devicePath, mountPath)
-		src := "/sys/kernel/security/slaunch/eventlog"
-		// src := "/eventlog_ross"
-		// dst := mountPath + "/boot"
-		dst := mountPath + "/"
-		fatal, err := writeSrcFiletoDst(src, dst)
-		if e := mount.Unmount(mountPath, true, false); e != nil {
-			log.Printf("Unmount failed. PANIC\n")
-			panic(e)
-		}
-
-		if fatal {
-			// fatal error means source file doesn't exist. no point trying other devices.
-			return fmt.Errorf("writeSrcFiletoDst returned fatal error err=%v, exiting", err)
-		}
-
-		if err != nil {
-			log.Printf("writeSrcFiletoDst returned non fatal error err=%v, continuing to next device\n", err)
-			continue
-		}
-
-		log.Printf("writeSrcFiletoDst successful: src=%s, dst=%s", src, dst)
-		return nil
-	}
-
-	return fmt.Errorf("writeFileToBootPartition failed")
+	log.Printf("writeSrcFiletoDst exiting, success src=%s written to targetFilePath=%s", src, target)
+	return target, nil
 }
 
 /* 	scanKernelCmdLine() ([]byte, error)
@@ -233,7 +297,7 @@ func scanKernelCmdLine() ([]byte, error) {
 	d, err := ioutil.ReadFile(mountPath)
 	if err != nil {
 		// - TODO: should we check for end of file ?
-		return nil, fmt.Errorf("Error reading policy file found at mountPath=%s, devicePath=%s, passed=%s\n", mountPath, devicePath, val)
+		return nil, fmt.Errorf("Error reading policy file found at mountPath=%s, devicePath=%s, passed=%s", mountPath, devicePath, val)
 	}
 	return d, nil
 }
@@ -248,7 +312,7 @@ func scanKernelCmdLine() ([]byte, error) {
 		respectively for each iteration of loop over SearchRoots slice. */
 func scanBlockDevice(mountPath string) ([]byte, bool) {
 
-	log.Printf("scanBlockDevice\n")
+	log.Printf("scanBlockDevice")
 	// scan for securelaunch.policy under /, /efi, or /boot
 	var SearchRoots = []string{"/", "/efi", "/boot"}
 	for _, c := range SearchRoots {
@@ -273,7 +337,7 @@ func scanBlockDevice(mountPath string) ([]byte, bool) {
 				log.Printf("Error reading policy file %s, continuing", o.Name)
 				continue
 			}
-			log.Printf("policy file found on mountPath=%s, directory =%s\n", mountPath, c)
+			log.Printf("policy file found on mountPath=%s, directory =%s", mountPath, c)
 			return d, true // return when first policy file found
 		}
 		// Policy File not found. Moving on to next search root...
@@ -295,7 +359,7 @@ func locateSLPolicy() ([]byte, error) {
 		return d, err
 	}
 
-	log.Printf("Searching and mounting block devices with bootable configs\n")
+	log.Printf("Searching and mounting block devices with bootable configs")
 	blkDevices := diskboot.FindDevices("/sys/class/block/*") // FindDevices find and *mounts* the devices.
 	if len(blkDevices) == 0 {
 		return nil, errors.New("No block devices found")
@@ -303,19 +367,19 @@ func locateSLPolicy() ([]byte, error) {
 
 	for _, device := range blkDevices {
 		devicePath, mountPath := device.DevPath, device.MountPath
-		log.Printf("scanning for policy file under devicePath=%s, mountPath=%s\n", devicePath, mountPath)
+		log.Printf("scanning for policy file under devicePath=%s, mountPath=%s", devicePath, mountPath)
 		raw, found := scanBlockDevice(mountPath)
 		if e := mount.Unmount(mountPath, true, false); e != nil {
-			log.Printf("Unmount failed. PANIC\n")
+			log.Printf("Unmount failed. PANIC")
 			panic(e)
 		}
 
 		if !found {
-			log.Printf("no policy file found under this device\n")
+			log.Printf("no policy file found under this device")
 			continue
 		}
 
-		log.Printf("policy file found.\n")
+		log.Printf("policy file found.")
 		return raw, nil
 	}
 
@@ -329,10 +393,11 @@ func parseSLPolicy(pf []byte) (*policy, error) {
 		Collectors    []json.RawMessage `json:"collectors"`
 		Attestor      json.RawMessage   `json:"attestor"`
 		Launcher      json.RawMessage   `json:"launcher"`
+		EventLog      json.RawMessage   `json:"eventlog"`
 	}
 
 	if err := json.Unmarshal(pf, &parse); err != nil {
-		log.Printf("parseSLPolicy: Unmarshall error for entire policy file!! err=%v\n", err)
+		log.Printf("parseSLPolicy: Unmarshall error for entire policy file!! err=%v", err)
 		return nil, err
 	}
 
@@ -341,28 +406,36 @@ func parseSLPolicy(pf []byte) (*policy, error) {
 	for _, c := range parse.Collectors {
 		collector, err := measurement.GetCollector(c)
 		if err != nil {
-			log.Printf("getCollector failed for c=%s, collector=%v\n", c, collector)
+			log.Printf("getCollector failed for c=%s, collector=%v", c, collector)
 			return nil, err
 		}
 		p.Collectors = append(p.Collectors, collector)
 	}
 
-	// log.Printf("len(parse.Launcher)=%d, parse.Launcher=%s\n", len(parse.Launcher), parse.Launcher)
+	// log.Printf("len(parse.Launcher)=%d, parse.Launcher=%s", len(parse.Launcher), parse.Launcher)
 	if len(parse.Launcher) > 0 {
 		if err := json.Unmarshal(parse.Launcher, &p.Launcher); err != nil {
-			log.Printf("parseSLPolicy: Launcher Unmarshall error=%v!!\n", err)
+			log.Printf("parseSLPolicy: Launcher Unmarshall error=%v!!", err)
 			return nil, err
 		}
 	}
+
+	if len(parse.EventLog) > 0 {
+		if err := json.Unmarshal(parse.EventLog, &p.EventLog); err != nil {
+			log.Printf("parseSLPolicy: EventLog Unmarshall error=%v!!", err)
+			return nil, err
+		}
+	}
+
 	return p, nil
 }
 
 func main() {
 
-	log.Printf("********Step 1: init completed. starting main ********\n")
+	log.Printf("********Step 1: init completed. starting main ********")
 	tpm2, err := tpm2.OpenTPM("/dev/tpm0")
 	if err != nil {
-		log.Printf("Couldn't talk to TPM Device: err=%v\n", err)
+		log.Printf("Couldn't talk to TPM Device: err=%v", err)
 		os.Exit(1)
 	}
 
@@ -370,50 +443,50 @@ func main() {
 	// log.Printf("TPM version %s", tpm.Version())
 	// TODO Request TPM locality 2, requires extending go-tpm for locality request
 
-	log.Printf("********Step 2: locateSLPolicy ********\n")
+	log.Printf("********Step 2: locateSLPolicy ********")
 	rawBytes, err := locateSLPolicy()
 	if err != nil {
 		// TODO unmount all devices.
-		log.Printf("locateSLPolicy failed: err=%v\n", err)
+		log.Printf("locateSLPolicy failed: err=%v", err)
 		//need to decide how to bail, reboot, error msg & halt, or
 		//recovery shell
 		os.Exit(1)
 	}
 
-	log.Printf("policy file located\n")
-	log.Printf("********Step 3: parseSLPolicy ********\n")
+	log.Printf("policy file located")
+	log.Printf("********Step 3: parseSLPolicy ********")
 	// The policy file must be measured and extended into PCR21 (PCR15
 	// until DRTM launch is working and able to set locality
 	p, err := parseSLPolicy(rawBytes)
 	if err != nil {
 		//need to decide how to bail, reboot, error msg & halt, or
 		//recovery shell
-		log.Printf("parseSLPolicy failed \n")
+		log.Printf("parseSLPolicy failed ")
 		return
 	}
 
 	if p == nil {
-		log.Printf("SL Policy parsed into a null set\n")
+		log.Printf("SL Policy parsed into a null set")
 		os.Exit(1)
 	}
 
-	log.Printf("policy file parsed\n")
+	log.Printf("policy file parsed")
 
-	log.Printf("********Step 4: Collecting Evidence ********\n")
-	// log.Printf("policy file parsed=%v\n", p)
+	log.Printf("********Step 4: Collecting Evidence ********")
+	// log.Printf("policy file parsed=%v", p)
 	for _, c := range p.Collectors {
-		log.Printf("Input Collector: %v\n", c)
+		log.Printf("Input Collector: %v", c)
 		c.Collect(tpm2)
 	}
-	log.Printf("Collectors completed\n")
+	log.Printf("Collectors completed")
 
-	log.Printf("********Step 5: Write eventlog to /boot partition*********\n")
-	if e := writeFileToBootPartition(); e != nil {
-		log.Printf("write eventlog File To Boot Partition failed err=%v", e)
+	log.Printf("********Step 5: Write parsed eventlog to disk *********")
+	if e := p.EventLog.Persist(); e != nil {
+		log.Printf("write eventlog File To Disk failed err=%v", e)
 		return
 	}
 
-	log.Printf("********Step 5: Launcher called ********\n")
+	log.Printf("********Step 5: Launcher called ********")
 	p.Launcher.Boot(tpm2)
 }
 
@@ -483,7 +556,7 @@ func scanIscsiDrives() error {
 	if err00 := cmd00.Run(); err00 != nil {
 		fmt.Println(err00)
 	} else {
-		log.Printf("Output: \n%v", cmd00.Stdout)
+		log.Printf("Output: %v", cmd00.Stdout)
 	}
 	return nil
 }
@@ -602,7 +675,7 @@ func init() {
 	if err0 := cmd0.Run(); err0 != nil {
 		fmt.Println(err0)
 	} else {
-		log.Printf("Output: \n%v", cmd0.Stdout)
+		log.Printf("Output: %v", cmd0.Stdout)
 	}
 
 	/*
@@ -681,7 +754,7 @@ func init() {
 	if err1 := cmd1.Run(); err1 != nil {
 		fmt.Println(err1)
 	} else {
-		log.Printf("Output: \n%v", cmd1.Stdout)
+		log.Printf("Output: %v", cmd1.Stdout)
 	}
 
 	cmd2 := exec.Command("ls", "/sys/class/block")
@@ -691,17 +764,18 @@ func init() {
 	if err2 := cmd2.Run(); err2 != nil {
 		fmt.Println(err2)
 	} else {
-		log.Printf("Output: \n%v", cmd2.Stdout)
+		log.Printf("Output: %v", cmd2.Stdout)
 	}
 
-	cmd3 := exec.Command("tpmtool", "eventlog", "dump", "--txt", "--tpm20", "/sys/kernel/security/slaunch/eventlog")
+	cmd3 := exec.Command("tpmtool", "eventlog", "dump", "--txt", "--tpm12", "/eventlog_ross > /tmp/parsedEvtLog.txt")
+	// cmd3 := exec.Command("tpmtool", "eventlog", "dump", "--txt", "--tpm20", "/sys/kernel/security/slaunch/eventlog > /tmp/parsedEvtLog.txt")
 	var out3 bytes.Buffer
 	cmd3.Stdout = &out3
 	log.Printf("Executing %v", cmd3.Args)
 	if err3 := cmd3.Run(); err != nil {
 		fmt.Println(err3)
 	} else {
-		log.Printf("Output: \n%v", cmd3.Stdout)
+		log.Printf("Output: %v", cmd3.Stdout)
 	}
 	/*
 	   s := "sleeping, press CTRL C if u like"

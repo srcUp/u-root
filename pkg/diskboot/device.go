@@ -75,6 +75,16 @@ func FindDevices(devicesGlob string) (devices []*Device) {
 }
 
 // FindDevice attempts to construct a boot device at the given path
+func FindDeviceRW(devPath string) (*Device, error) {
+	fstypes, err := storage.GetSupportedFilesystems()
+	if err != nil {
+		return nil, nil
+	}
+
+	return mountDeviceRW(devPath, fstypes)
+}
+
+// FindDevice attempts to construct a boot device at the given path
 func FindDevice(devPath string) (*Device, error) {
 	fstypes, err := storage.GetSupportedFilesystems()
 	if err != nil {
