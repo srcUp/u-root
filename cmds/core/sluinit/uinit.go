@@ -282,8 +282,9 @@ func scanKernelCmdLine() ([]byte, error) {
 	// val is of type sda:path
 	mntFilePath, mountPath, e := GetMountedFilePath(val, false) // false means readonly mount
 	if e != nil {
-		log.Printf("scanKernelCmdLine: GetMountedFilePath err=%v", e)
+		return nil, fmt.Errorf("scanKernelCmdLine: GetMountedFilePath err=%v", e)
 	}
+
 	log.Printf("scanKernelCmdLine: Reading file=%s", mntFilePath)
 
 	d, err := ioutil.ReadFile(mntFilePath)
