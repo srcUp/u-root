@@ -22,105 +22,108 @@ import (
 	// "time"
 )
 
-/*
- * NOTE: Caller to unmount the device after use
- * obtains file path based on input entered by user in policy file.
- * inputVal is of format <block device identifier>:<path>
- * Example sda:/path/to/file
- * - mount device
+// Caller's responsbility to unmount this..use mountPath returned to unmount.
+// obtains file path based on input entered by user in policy file.
+// inputVal is of format <block device identifier>:<path>
+// rw_option = true --> mount is read write type
+// Example sda:/path/to/file
+/* - mount device
  * - Get file Path on mounted device.
- * - DOES NOT Unmount device
+ * - does NOT Unmount device, use returned devicePath to unmount...
+ * returns filePath, mountPath, error in that order
  */
-func GetMountedFilePath(inputVal string) (string, error) {
+func GetMountedFilePath(inputVal string, rw_option bool) (string, string, error) {
 	s := strings.Split(inputVal, ":")
 	if len(s) != 2 {
-		return "", fmt.Errorf("%s: Usage: <block device identifier>:<path>\n", inputVal)
+		return "", "", fmt.Errorf("%s: Usage: <block device identifier>:<path>", inputVal)
 	}
 
-	devicePath := filepath.Join("/dev", s[0])   // assumes deviceId is sda, devicePath=/dev/sda
-	dev, err := diskboot.FindDevice(devicePath) // FindDevice fn mounts devicePath=/dev/sda.
+	devicePath := filepath.Join("/dev", s[0]) // assumes deviceId is sda, devicePath=/dev/sda
+	var dev *diskboot.Device
+	var err error
+	if rw_option {
+		dev, err = diskboot.FindDeviceRW(devicePath) // FindDevice fn mounts , w rw option, devicePath=/dev/sda.
+	} else {
+		dev, err = diskboot.FindDevice(devicePath) // FindDevice fn mounts devicePath=/dev/sda.
+	}
 	if err != nil {
-		fmt.Printf("Mount %v failed, err=%v\n", devicePath, err)
-		return "", err
+		log.Printf("Mount %v failed, err=%v", devicePath, err)
+		return "", "", err
 	}
 
 	filePath := dev.MountPath + s[1] // mountPath=/tmp/path/to/target/file if /dev/sda mounted on /tmp
-	return filePath, nil
+	return filePath, dev.MountPath, nil
 }
 
 // https://stackoverflow.com/questions/10510691/how-to-check-whether-a-file-or-directory-exists
 // exists returns whether the given file or directory exists
-func exists(path string) (bool, error) {
-	_, err := os.Stat(path)
+// also returns if the path is a directory
+func exists(path string) (bool, bool, error) {
+	fileInfo, err := os.Stat(path)
 	if err == nil {
-		return true, nil
+		return true, fileInfo.IsDir(), nil
 	}
 	if os.IsNotExist(err) {
-		return false, nil
+		return false, false, nil
 	}
-	return true, err
+	// file or dir def exists..
+	return true, fileInfo.IsDir(), err
 }
 
-func writeSrcFiletoDst(src, dst string) (bool, error) {
-	FileFound, err := exists(src)
-	if !FileFound {
-		return true, fmt.Errorf("File to be written doesnt exist: \n")
+// src and dst are already mounted file paths.
+// src := Absolute source file path
+// dst := Absolute destination file path
+// defFileName := default file name, only used if user doesn't provide one.
+// returns the target file path where file was written..
+func writeSrcFiletoDst(src, dst, defFileName string) (string, error) {
+	srcFileFound, _, err := exists(src)
+	if !srcFileFound {
+		return "", fmt.Errorf("File to be written doesnt exist:")
 	}
 
 	d, err := ioutil.ReadFile(src)
 	if err != nil {
-		return true, fmt.Errorf("Error reading src file %s, err=%v", src, err)
+		return "", fmt.Errorf("Error reading src file %s, err=%v", src, err)
 	}
 
-	bootDeviceFound, err := exists(dst)
-	if !bootDeviceFound {
-		return false, fmt.Errorf("This device doesnt contain boot parition\n")
+	// make sure dst is an absolute file path
+	if !filepath.IsAbs(dst) {
+		return "", fmt.Errorf("Error: dst =%s Not an absolute path ", dst)
 	}
 
-	dst_file := dst + "eventlog"
-	err = ioutil.WriteFile(dst_file, d, 0644)
+	// target is the full absolute path where thesrc will be written to
+	target := dst
+
+	/*dst = /foo/bar/eventlog, check if /foo/bar/eventlog is a dir or file that exists..
+		 *if it exists as a file, this if loop is untouched.
+	     *if it exists as a dir, append defaul file name to it
+		 *NOT both dst = /foo/bar/ and dst=/foo/bar are considered dirs i.e. trailing "/" has no meaning..
+	*/
+	dstFound, is_dir, err := exists(dst)
+	if is_dir {
+		if !dstFound {
+			return "", fmt.Errorf("destination dir doesn't")
+		} else {
+			log.Printf("No file name provided. Adding it here.old target=%s", target)
+			// no file name was provided. Use default.
+			// check if defFileName doesn't have a trailing "/"
+			if strings.HasPrefix(defFileName, "/") || strings.HasSuffix(dst, "/") {
+				target = dst + defFileName
+			} else {
+				log.Printf("I need to construct filepath. ERROR: Pass dir w suffix=/ or fname w prefix=/")
+				return "", fmt.Errorf("Pass dir w suffix=/ or fname w prefix=/")
+			}
+			log.Printf("New target=%s", target)
+		}
+	}
+
+	log.Printf("target=%s", target)
+	err = ioutil.WriteFile(target, d, 0644)
 	if err != nil {
-		return true, fmt.Errorf("Could't write file to %s, err=%v", dst_file, err)
+		return "", fmt.Errorf("Could't write file to %s, err=%v", target, err)
 	}
-	log.Printf("writeSrcFiletoDst exiting, no error")
-	return false, nil
-}
-
-func WriteFileToBootPartition() error {
-	log.Printf("Searching and mounting block devices with bootable configs\n")
-	blkDevices := diskboot.FindDevicesRW("/sys/class/block/*") // FindDevices find and *mounts* the devices as rw,user.
-	if len(blkDevices) == 0 {
-		return errors.New("No block devices found")
-	}
-
-	for _, device := range blkDevices {
-		devicePath, mountPath := device.DevPath, device.MountPath
-		log.Printf("Finding device with boot parition under devicePath=%s, mountPath=%s\n", devicePath, mountPath)
-		src := "/sys/kernel/security/slaunch/eventlog"
-		// src := "/eventlog_ross"
-		// dst := mountPath + "/boot"
-		dst := mountPath + "/"
-		fatal, err := writeSrcFiletoDst(src, dst)
-		if e := mount.Unmount(mountPath, true, false); e != nil {
-			log.Printf("Unmount failed. PANIC\n")
-			panic(e)
-		}
-
-		if fatal {
-			// fatal error means source file doesn't exist. no point trying other devices.
-			return fmt.Errorf("writeSrcFiletoDst returned fatal error err=%v, exiting", err)
-		}
-
-		if err != nil {
-			log.Printf("writeSrcFiletoDst returned non fatal error err=%v, continuing to next device\n", err)
-			continue
-		}
-
-		log.Printf("writeSrcFiletoDst successful: src=%s, dst=%s", src, dst)
-		return nil
-	}
-
-	return fmt.Errorf("writeFileToBootPartition failed")
+	log.Printf("writeSrcFiletoDst exiting, success src=%s written to targetFilePath=%s", src, target)
+	return target, nil
 }
 
 /* 	scanKernelCmdLine() ([]byte, error)
@@ -138,16 +141,21 @@ func scanKernelCmdLine() ([]byte, error) {
 	}
 
 	// val is of type sda:path
-	mountPath, e := GetMountedFilePath(val)
+	mntFilePath, mountPath, e := GetMountedFilePath(val, false) // false means readonly mount
 	if e != nil {
 		log.Printf("scanKernelCmdLine: GetMountedFilePath err=%v", e)
 	}
-	log.Printf("scanKernelCmdLine: Reading file=%s", mountPath)
+	log.Printf("scanKernelCmdLine: Reading file=%s", mntFilePath)
 
-	d, err := ioutil.ReadFile(mountPath)
+	d, err := ioutil.ReadFile(mntFilePath)
+	if e := mount.Unmount(mountPath, true, false); e != nil {
+		log.Printf("Unmount failed. PANIC")
+		panic(e)
+	}
+
 	if err != nil {
 		// - TODO: should we check for end of file ?
-		return nil, fmt.Errorf("Error reading policy file:mountPath=%s, passed=%s\n", mountPath, val)
+		return nil, fmt.Errorf("Error reading policy file:mountPath=%s, passed=%s\n", mntFilePath, val)
 	}
 	return d, nil
 }

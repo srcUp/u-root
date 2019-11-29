@@ -3,6 +3,7 @@ package securelaunch
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/u-root/u-root/pkg/diskboot"
 	"github.com/u-root/u-root/pkg/mount"
 	"github.com/u-root/u-root/pkg/securelaunch/measurement"
@@ -10,7 +11,8 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	// "time"v
+	"path/filepath"
+	// "time"
 	// "github.com/u-root/iscsinl"
 )
 
@@ -24,6 +26,63 @@ type policy struct {
 	DefaultAction string
 	Collectors    []measurement.Collector
 	Launcher      launcher
+	EventLog      eventlog
+}
+
+type eventlog struct {
+	Type     string `json:"type"`
+	Location string `json:"location"`
+}
+
+// /tmp/parsedEvtLog.txt --> written to --> eventlog_path
+func (e *eventlog) Persist() error {
+
+	if e.Type != "file" {
+		return fmt.Errorf("EventLog: Unsupported eventlog type. Exiting.")
+	}
+
+	log.Printf("Identified EventLog Type = file")
+
+	// e.Location is of the form sda:path/to/file.txt
+	eventlog_path := e.Location
+	if eventlog_path == "" {
+		return fmt.Errorf("EventLog: Empty eventlog path. Exiting.")
+	}
+
+	filePath, mountPath, r := GetMountedFilePath(eventlog_path, true) // true = rw mount option
+	if r != nil {
+		return fmt.Errorf("EventLog: ERR: eventlog input %s couldnt be located, err=%v", eventlog_path, r)
+	}
+
+	dst := filePath // /tmp/boot-733276578/evtlog
+	src1 := "/tmp/parsedEvtLog.txt"
+	src2 := "/tmp/cpuid.txt"
+	default1_fname := "eventlog.txt"
+	default2_fname := "cpuid.txt"
+
+	target1, err1 := writeSrcFiletoDst(src1, dst, default1_fname)
+	target2, err2 := writeSrcFiletoDst(src2, filepath.Dir(dst)+"/", default2_fname)
+	if ret := mount.Unmount(mountPath, true, false); ret != nil {
+		log.Printf("Unmount failed. PANIC")
+		panic(ret)
+	}
+
+	if err1 == nil && err2 == nil {
+		log.Printf("writeSrcFiletoDst successful: src1=%s, src2=%s, dst1=%s, dst2=%s", src1, src2, target1, target2)
+		return nil
+	}
+
+	if err1 != nil {
+		// return fmt.Errorf("writeSrcFiletoDst: src1 returned errors err1=%v, src1=%s, dst1=%s, exiting", err1, src1, dst)
+		log.Printf("writeSrcFiletoDst: src1 returned errors err1=%v, src1=%s, dst1=%s, exiting", err1, src1, dst)
+	}
+
+	if err2 != nil {
+		// return fmt.Errorf("writeSrcFiletoDst src2 returned errors err2=%v, src2=%s, dst2=%s", err2, src2, filepath.Dir(dst)+default2_fname)
+		log.Printf("writeSrcFiletoDst src2 returned errors err2=%v, src2=%s, dst2=%s", err2, src2, filepath.Dir(dst)+default2_fname)
+	}
+
+	return nil
 }
 
 func (l *launcher) Boot(t io.ReadWriter) {
@@ -49,13 +108,13 @@ func (l *launcher) Boot(t io.ReadWriter) {
 		return
 	}
 
-	k, e := GetMountedFilePath(kernel)
+	k, _, e := GetMountedFilePath(kernel, false) // false=read only mount option
 	if e != nil {
 		log.Printf("Launcher: ERR: kernel input %s couldnt be located, err=%v\n", kernel, e)
 		return
 	}
 
-	i, e := GetMountedFilePath(initrd)
+	i, _, e := GetMountedFilePath(initrd, false) // false=read only mount option
 	if e != nil {
 		log.Printf("Launcher: ERR: initrd input %s couldnt be located, err=%v\n", initrd, e)
 		return
@@ -136,6 +195,7 @@ func ParseSLPolicy(pf []byte) (*policy, error) {
 		Collectors    []json.RawMessage `json:"collectors"`
 		Attestor      json.RawMessage   `json:"attestor"`
 		Launcher      json.RawMessage   `json:"launcher"`
+		EventLog      json.RawMessage   `json:"eventlog"`
 	}
 
 	if err := json.Unmarshal(pf, &parse); err != nil {
@@ -158,6 +218,13 @@ func ParseSLPolicy(pf []byte) (*policy, error) {
 	if len(parse.Launcher) > 0 {
 		if err := json.Unmarshal(parse.Launcher, &p.Launcher); err != nil {
 			log.Printf("parseSLPolicy: Launcher Unmarshall error=%v!!\n", err)
+			return nil, err
+		}
+	}
+
+	if len(parse.EventLog) > 0 {
+		if err := json.Unmarshal(parse.EventLog, &p.EventLog); err != nil {
+			log.Printf("parseSLPolicy: EventLog Unmarshall error=%v!!", err)
 			return nil, err
 		}
 	}

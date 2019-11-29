@@ -62,8 +62,8 @@ func main() {
 	log.Printf("Collectors completed\n")
 
 	log.Printf("********Step 5: Write eventlog to /boot partition*********\n")
-	if e := slaunch.WriteFileToBootPartition(); e != nil {
-		log.Printf("write eventlog File To Boot Partition failed err=%v", e)
+	if e := p.EventLog.Persist(); e != nil {
+		log.Printf("write eventlog File To Disk failed err=%v", e)
 		return
 	}
 
@@ -82,5 +82,5 @@ func init() {
 
 	slaunch.Cmd_exec("ls", []string{"/sys/class/net"})
 	slaunch.Cmd_exec("ls", []string{"/sys/class/block"})
-	slaunch.Cmd_exec("tpmtool", []string{"eventlog", "dump", "--txt", "--tpm20", "/sys/kernel/security/slaunch/eventlog"})
+	slaunch.Cmd_exec("tpmtool", []string{"eventlog", "dump", "--txt", "--tpm20", "/sys/kernel/security/slaunch/eventlog > /tmp/parsedEvtLog.txt"})
 }
