@@ -6,6 +6,8 @@ import (
 	"github.com/u-root/u-root/pkg/diskboot"
 	"github.com/u-root/u-root/pkg/mount"
 	slaunch "github.com/u-root/u-root/pkg/securelaunch"
+	"github.com/u-root/u-root/pkg/securelaunch/eventlog"
+	"github.com/u-root/u-root/pkg/securelaunch/launcher"
 	"github.com/u-root/u-root/pkg/securelaunch/measurement"
 	"log"
 )
@@ -19,6 +21,8 @@ import (
 type policy struct {
 	DefaultAction string
 	Collectors    []measurement.Collector
+	Launcher      launcher.Launcher
+	EventLog      eventlog.EventLog
 }
 
 /*
@@ -95,5 +99,18 @@ func Parse(pf []byte) (*policy, error) {
 		p.Collectors = append(p.Collectors, collector)
 	}
 
+	if len(parse.Launcher) > 0 {
+		if err := json.Unmarshal(parse.Launcher, &p.Launcher); err != nil {
+			log.Printf("parse policy: Launcher Unmarshall error=%v!!\n", err)
+			return nil, err
+		}
+	}
+
+	if len(parse.EventLog) > 0 {
+		if err := json.Unmarshal(parse.EventLog, &p.EventLog); err != nil {
+			log.Printf("parse policy: EventLog Unmarshall error=%v!!", err)
+			return nil, err
+		}
+	}
 	return p, nil
 }
