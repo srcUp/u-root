@@ -6,11 +6,13 @@ import (
 	"github.com/u-root/u-root/pkg/diskboot"
 	"github.com/u-root/u-root/pkg/mount"
 	slaunch "github.com/u-root/u-root/pkg/securelaunch"
+	"github.com/u-root/u-root/pkg/securelaunch/measurement"
 	"log"
 )
 
 type policy struct {
 	DefaultAction string
+	Collectors    []measurement.Collector
 }
 
 /*
@@ -72,6 +74,15 @@ func Parse(pf []byte) (*policy, error) {
 	}
 
 	p.DefaultAction = parse.DefaultAction
+
+	for _, c := range parse.Collectors {
+		collector, err := measurement.GetCollector(c)
+		if err != nil {
+			log.Printf("GetCollector err:c=%s, collector=%v\n", c, collector)
+			return nil, err
+		}
+		p.Collectors = append(p.Collectors, collector)
+	}
 
 	return p, nil
 }

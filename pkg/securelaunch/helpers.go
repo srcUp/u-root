@@ -15,6 +15,7 @@ import (
 	"github.com/u-root/u-root/pkg/storage"
 	"io/ioutil"
 	"log"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -22,6 +23,74 @@ import (
 
 var storageBlkDevices []storage.BlockDev
 var Debug = func(string, ...interface{}) {}
+
+/*
+ * modified ver of https://stackoverflow.com/questions/10510691/how-to-check-whether-a-file-or-directory-exists
+ * exists returns whether the given file or directory exists
+ * also returns if the path is a directory
+ */
+func exists(path string) (bool, bool, error) {
+	fileInfo, err := os.Stat(path)
+	if err == nil {
+		return true, fileInfo.IsDir(), nil
+	}
+	if os.IsNotExist(err) {
+		return false, false, nil
+	}
+	// file or dir def exists..
+	return true, fileInfo.IsDir(), err
+}
+
+/*
+ * data is a []byte slice
+ * dst is an already mounted file path.
+ * dst is an Absolute file path.
+ * defFileName is default dst file name, only used if user doesn't provide one.
+ * returns
+ * 1. target file path where file was written
+ * 2. error
+ */
+func WriteToFile(data []byte, dst, defFileName string) (string, error) {
+
+	// make sure dst is an absolute file path
+	if !filepath.IsAbs(dst) {
+		return "", fmt.Errorf("Error: dst =%s Not an absolute path ", dst)
+	}
+
+	// target is the full absolute path where []byte will be written to
+	target := dst
+
+	/* dst = /foo/bar/eventlog, check if /foo/bar/eventlog is a dir or file that exists..
+	     * if it exists as a file, this if loop is untouched.
+		 * if it exists as a dir, append defFileName to it
+	     * NOTE both dst = /foo/bar/ and dst=/foo/bar are considered dirs i.e. trailing "/" has no meaning..
+	*/
+	dstFound, is_dir, err := exists(dst)
+	if is_dir {
+		if !dstFound {
+			return "", fmt.Errorf("destination dir doesn't")
+		} else {
+			// User provided a dir, Use defFileName as target
+			Debug("No file name provided. Adding it here.old target=%s", target)
+			// check if defFileName doesn't have a trailing "/"
+			if strings.HasPrefix(defFileName, "/") || strings.HasSuffix(dst, "/") {
+				target = dst + defFileName
+			} else {
+				log.Printf("INTERNAL ERROR: Pass dir w suffix=/ or fname w prefix=/")
+				return "", fmt.Errorf("Pass dir w suffix=/ or fname w prefix=/")
+			}
+			Debug("New target=%s", target)
+		}
+	}
+
+	Debug("target=%s", target)
+	err = ioutil.WriteFile(target, data, 0644)
+	if err != nil {
+		return "", fmt.Errorf("Could't write file to %s, err=%v", target, err)
+	}
+	Debug("WriteToFile exit w success data written to target=%s", target)
+	return target, nil
+}
 
 /*
  * NOTE: Caller's responsbility to unmount this..use return var mountPath to unmount in caller.
