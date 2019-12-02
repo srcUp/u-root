@@ -99,6 +99,34 @@ func WriteToFile(data []byte, dst, defFileName string) (string, error) {
 }
 
 /*
+ * src and dst are already mounted file paths.
+ * src and dst are Absolute file paths
+ * defFileName is default dst file name, only used if user doesn't provide one.
+ * returns
+ * 1. target file path where file was written
+ * 2. error
+ */
+func WriteSrcFiletoDst(src, dst, defFileName string) (string, error) {
+	srcFileFound, _, err := exists(src)
+	if !srcFileFound {
+		return "", fmt.Errorf("File to be written doesnt exist:")
+	}
+
+	d, err := ioutil.ReadFile(src)
+	if err != nil {
+		return "", fmt.Errorf("Error reading src file %s, err=%v", src, err)
+	}
+
+	target, err := WriteToFile(d, dst, defFileName)
+	if err != nil {
+		return "", fmt.Errorf("WriteSrcFiletoDst failed err=%v", err)
+	}
+
+	Debug("WriteSrcFileToDst exit w success src=%s written to target=%s", src, target)
+	return target, nil
+}
+
+/*
  * NOTE: Caller's responsbility to unmount this..use return var mountPath to unmount in caller.
  *
  * obtains absolute file path based on input entered by user in policy file.
