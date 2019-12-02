@@ -54,6 +54,12 @@ func main() {
 	slaunch.Debug("********Step 4: Collecting Evidence ********")
 	slaunch.Debug("policy file parsed=%v\n", p)
 
+	for _, c := range p.Collectors {
+		slaunch.Debug("Input Collector: %v\n", c)
+		c.Collect(tpmDev)
+	}
+	slaunch.Debug("Collectors completed\n")
+
 }
 
 /*
