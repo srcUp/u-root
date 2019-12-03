@@ -63,6 +63,15 @@ func main() {
 	}
 	slaunch.Debug("Collectors completed\n")
 
+	slaunch.Debug("********Step 5: Write eventlog to /boot partition*********")
+	if e := p.EventLog.Persist(); e != nil {
+		log.Printf("EventLog.Persist() failed err=%v", e)
+		os.Exit(1)
+	}
+
+	slaunch.Debug("********Step 6: Launcher called ********")
+	err = p.Launcher.Boot(tpmDev)
+	log.Printf("Boot failed. err=%s", err)
 }
 
 /*
