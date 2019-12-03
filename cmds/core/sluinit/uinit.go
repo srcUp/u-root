@@ -33,10 +33,10 @@ func main() {
 	slaunch.Debug("********Step 2: locate SL Policy ********")
 	rawBytes, err := policy.Locate()
 	if err != nil {
-		log.Printf("locate SL Policy failed: err=%v\n", err)
+		log.Printf("locate SL Policy failed: err=%v", err)
 		os.Exit(1)
 	}
-	slaunch.Debug("policy file located\n")
+	slaunch.Debug("policy file located")
 
 	slaunch.Debug("********Step 3: parse SL Policy ********")
 	//TODO: The policy file must be measured and extended into PCR21 (PCR15
@@ -50,10 +50,18 @@ func main() {
 		log.Printf("SL Policy parsed into a null set")
 		os.Exit(1)
 	}
-	slaunch.Debug("policy file parsed\n")
+	slaunch.Debug("policy file parsed")
 
 	slaunch.Debug("********Step 4: Collecting Evidence ********")
 	slaunch.Debug("policy file parsed=%v\n", p)
+
+	for _, c := range p.Collectors {
+		slaunch.Debug("Input Collector: %v", c)
+		if e := c.Collect(tpmDev); e != nil {
+			log.Printf("Collector %v failed, err = %v", c, e)
+		}
+	}
+	slaunch.Debug("Collectors completed\n")
 
 }
 
