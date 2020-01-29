@@ -113,7 +113,8 @@ func getCPUIDInfo() []byte {
 func measureCPUIDFile(tpmHandle io.ReadWriteCloser) ([]byte, error) {
 
 	d := getCPUIDInfo() // return strings builder
-	if e := tpm.ExtendPCRDebug(tpmHandle, pcr, bytes.NewReader(d)); e != nil {
+	eventDesc := []byte(fmt.Sprintf("CPUID Collector: Measured CPUID Info"))
+	if e := tpm.ExtendPCRDebug(tpmHandle, pcr, bytes.NewReader(d), eventDesc); e != nil {
 		return nil, e
 	}
 
