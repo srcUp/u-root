@@ -9,9 +9,12 @@ import (
 	"fmt"
 	"io"
 	"log"
+	//"os"
+	//"os/exec"
 
 	"github.com/u-root/u-root/pkg/boot"
 	"github.com/u-root/u-root/pkg/boot/kexec"
+	// cmd "github.com/u-root/u-root/pkg/cmdline"
 	"github.com/u-root/u-root/pkg/mount"
 	slaunch "github.com/u-root/u-root/pkg/securelaunch"
 	"github.com/u-root/u-root/pkg/securelaunch/measurement"
@@ -85,34 +88,111 @@ func (l *Launcher) Boot(tpmDev io.ReadWriteCloser) error {
 	//		return e
 	//	}
 
-	k, _, e := slaunch.GetMountedFilePath(kernel, mount.MS_RDONLY)
+	k, kMountPath, e := slaunch.GetMountedFilePath(kernel, mount.MS_RDONLY)
 	if e != nil {
 		log.Printf("launcher: ERR: kernel input %s couldnt be located, err=%v", kernel, e)
 		return e
 	}
 
-	i, _, e := slaunch.GetMountedFilePath(initrd, mount.MS_RDONLY)
+	i, iMountPath, e := slaunch.GetMountedFilePath(initrd, mount.MS_RDONLY)
 	if e != nil {
 		log.Printf("launcher: ERR: initrd input %s couldnt be located, err=%v", initrd, e)
 		return e
 	}
+
+	// slaunch.Debug("********Step 7: kexec called  ********") No need for this anymore
+	// since sluinit has all the steps..
+	/*
+		var err error
+		// OL-kexec=1 use OL's kexec
+		// OL-kexec=2 use u-root's inhouse but with verbose set to true.
+		val, ok := cmd.Flag("OL-kexec")
+		if ok {
+			if val == "1" {
+				// log.Printf("running command : kexec -s --initrd %s --command-line %s kernel=[%s]\n", i, cmdline, k)
+				boot := exec.Command("kexec", "-l", "-s", "--initrd", i, "--command-line", cmdline, k)
+				// boot := exec.Command("kexec", "-s", "-i", i, "-l", k, "-c", cmdline) // this is u-root's kexec //
+				boot.Stdin = os.Stdin
+				boot.Stderr = os.Stderr
+				boot.Stdout = os.Stdout
+				if err = boot.Run(); err != nil {
+					//need to decide how to bail, reboot, error msg & halt, or
+					//recovery shell
+					log.Printf("command finished with error: %v\n", err)
+					goto ERR
+				}
+				//sudo sync; sudo umount -a; sudo kexec -e
+				boot = exec.Command("kexec", "-e")
+				if err = boot.Run(); err != nil {
+					//need to decide how to bail, reboot, error msg & halt, or
+					//recovery shell
+					log.Printf("command finished with error: %v\n", err)
+					goto ERR
+				}
+			} else if val == "2" {
+				image := &boot.LinuxImage{
+					Kernel:  uio.NewLazyFile(k),
+					Initrd:  uio.NewLazyFile(i),
+					Cmdline: cmdline,
+				}
+				if err = image.Load(true); err != nil {
+					log.Printf("kexec -l failed. err: %v", err)
+					goto ERR
+				}
+
+				err = kexec.Reboot()
+				if err != nil {
+					log.Printf("kexec reboot failed. err=%v", err)
+					goto ERR
+				}
+			}
+		} else {
+			image := &boot.LinuxImage{
+				Kernel:  uio.NewLazyFile(k),
+				Initrd:  uio.NewLazyFile(i),
+				Cmdline: cmdline,
+			}
+			if err = image.Load(false); err != nil {
+				log.Printf("kexec -l failed. err: %v", err)
+				goto ERR
+			}
+
+			err = kexec.Reboot()
+			if err != nil {
+				log.Printf("kexec reboot failed. err=%v", err)
+				goto ERR
+			}
+		}*/
 
 	image := &boot.LinuxImage{
 		Kernel:  uio.NewLazyFile(k),
 		Initrd:  uio.NewLazyFile(i),
 		Cmdline: cmdline,
 	}
-	if err := image.Load(false); err != nil {
+	err := image.Load(false)
+	if err != nil {
 		log.Printf("kexec -l failed. err: %v", err)
-		return err
+		goto ERR
+		// return err
 	}
 
-	err := kexec.Reboot()
+	err = kexec.Reboot()
 	if err != nil {
 		log.Printf("kexec reboot failed. err=%v", err)
-		return err
+		goto ERR
 	}
 	return nil
+ERR:
+	// On error, unmount the files on disk holding kernel and initrd files
+	if e := mount.Unmount(kMountPath, true, false); e != nil {
+		log.Printf("Unmount failed. PANIC")
+		panic(e)
+	}
+	if e := mount.Unmount(iMountPath, true, false); e != nil {
+		log.Printf("Unmount failed. PANIC")
+		panic(e)
+	}
+	return err
 }
 
 // Boot uses kexec to boot into the target kernel.
