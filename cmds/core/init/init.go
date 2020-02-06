@@ -23,6 +23,7 @@ import (
 )
 
 var (
+	// verbose  = flag.Bool("v", true, "print all build commands")
 	verbose  = flag.Bool("v", false, "print all build commands")
 	test     = flag.Bool("test", false, "Test mode: don't try to set control tty")
 	debug    = func(string, ...interface{}) {}
@@ -88,6 +89,8 @@ func main() {
 		libinit.Command("/bin/uinit", ctty, uinitArgs),
 		libinit.Command("/buildbin/uinit", ctty, uinitArgs),
 
+		// libinit.Command("/bin/defaultsh", ctty),
+		// libinit.Command("/bin/sh", ctty),
 		libinit.Command("/bin/defaultsh", ctty),
 		libinit.Command("/bin/sh", ctty),
 	}
