@@ -51,6 +51,7 @@ func NewFileCollector(config []byte) (Collector, error) {
  */
 func HashFile(tpmHandle io.ReadWriteCloser, inputVal string) error {
 	// inputVal is of type sda:path
+	// mntFilePath, mp, e := slaunch.GetMountedFilePath(inputVal, mount.MS_RDONLY)
 	mntFilePath, mountPath, e := slaunch.GetMountedFilePath(inputVal, mount.MS_RDONLY)
 	if e != nil {
 		log.Printf("HashFile: GetMountedFilePath err=%v", e)
@@ -64,10 +65,16 @@ func HashFile(tpmHandle io.ReadWriteCloser, inputVal string) error {
 		log.Printf("File Collector: Unmount failed. PANIC\n")
 		panic(e)
 	}
+	/*
+		if e := mp.Unmount(mount.MNT_DETACH); e != nil {
+			log.Printf("Failed to unmount %v: %v", mp, e)
+			panic(e)
+		} */
 
 	if err != nil {
 		return fmt.Errorf("failed to read target file: filePath=%s, mountPath=%s, inputVal=%s, err=%v",
 			mntFilePath, mountPath, inputVal, err)
+		//	mntFilePath, mp.Path, inputVal, err)
 	}
 
 	eventDesc := fmt.Sprintf("File Collector: measured %s", inputVal)

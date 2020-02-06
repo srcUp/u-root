@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/u-root/u-root/pkg/boot/diskboot"
+	// "github.com/u-root/u-root/pkg/mount"
 	"github.com/u-root/u-root/pkg/storage"
 )
 
@@ -63,10 +64,12 @@ func WriteToFile(data []byte, dst, defFileName string) (string, error) {
  *
  * NOTE: Caller's responsbility to unmount this..use return var mountPath to unmount in caller.
  */
+// func GetMountedFilePath(inputVal string, flags uintptr) (string, *mount.MountPoint, error) {
 func GetMountedFilePath(inputVal string, flags uintptr) (string, string, error) {
 	s := strings.Split(inputVal, ":")
 	if len(s) != 2 {
 		return "", "", fmt.Errorf("%s: Usage: <block device identifier>:<path>", inputVal)
+		// return "", nil, fmt.Errorf("%s: Usage: <block device identifier>:<path>", inputVal)
 	}
 
 	// s[0] can be sda or UUID. if UUID, then we need to find its name
@@ -74,6 +77,7 @@ func GetMountedFilePath(inputVal string, flags uintptr) (string, string, error) 
 	if !strings.HasPrefix(deviceId, "sd") {
 		if e := getBlkInfo(); e != nil {
 			return "", "", fmt.Errorf("getBlkInfo err=%s", e)
+			// return "", nil, fmt.Errorf("getBlkInfo err=%s", e)
 		}
 		devices := storage.PartitionsByFsUUID(storageBlkDevices, s[0]) // []BlockDev
 		for _, device := range devices {
@@ -87,6 +91,7 @@ func GetMountedFilePath(inputVal string, flags uintptr) (string, string, error) 
 	dev, err := diskboot.FindDevice(devicePath, flags) // FindDevice fn mounts devicePath=/dev/sda.
 	if err != nil {
 		return "", "", fmt.Errorf("failed to mount %v , flags=%v, err=%v", devicePath, flags, err)
+		// return "", nil, fmt.Errorf("failed to mount %v , flags=%v, err=%v", devicePath, flags, err)
 	}
 
 	Debug("Mounted %s", devicePath)

@@ -131,6 +131,7 @@ func measureCPUIDFile(tpmHandle io.ReadWriteCloser) ([]byte, error) {
 func persist(data []byte, cpuidTargetPath string) error {
 
 	// cpuidTargetPath is of form sda:/boot/cpuid.txt
+	// filePath, mp, r := slaunch.GetMountedFilePath(cpuidTargetPath, 0) // 0 is flag for rw mount option
 	filePath, mountPath, r := slaunch.GetMountedFilePath(cpuidTargetPath, 0) // 0 is flag for rw mount option
 	if r != nil {
 		return fmt.Errorf("EventLog: ERR: input %s could NOT be located, err=%v", cpuidTargetPath, r)
@@ -143,6 +144,11 @@ func persist(data []byte, cpuidTargetPath string) error {
 		log.Printf("Unmount failed. PANIC")
 		panic(ret)
 	}
+	/*
+		if e := mp.Unmount(mount.MNT_DETACH); e != nil {
+			log.Printf("Failed to unmount %v: %v", mp, e)
+			panic(e)
+		}*/
 
 	if err != nil {
 		log.Printf("persist: err=%s", err)

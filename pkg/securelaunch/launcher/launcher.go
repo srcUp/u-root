@@ -88,12 +88,14 @@ func (l *Launcher) Boot(tpmDev io.ReadWriteCloser) error {
 	//		return e
 	//	}
 
+	//k, mpK, e := slaunch.GetMountedFilePath(kernel, mount.MS_RDONLY)
 	k, kMountPath, e := slaunch.GetMountedFilePath(kernel, mount.MS_RDONLY)
 	if e != nil {
 		log.Printf("launcher: ERR: kernel input %s couldnt be located, err=%v", kernel, e)
 		return e
 	}
 
+	// i, mpI, e := slaunch.GetMountedFilePath(initrd, mount.MS_RDONLY)
 	i, iMountPath, e := slaunch.GetMountedFilePath(initrd, mount.MS_RDONLY)
 	if e != nil {
 		log.Printf("launcher: ERR: initrd input %s couldnt be located, err=%v", initrd, e)
@@ -193,6 +195,15 @@ ERR:
 		panic(e)
 	}
 	return err
+	//ERR:
+	//	if e := mpK.Unmount(mount.MNT_DETACH); e != nil {
+	//		log.Printf("Failed to unmount %v: %v", mpK, e)
+	//		panic(e)
+	//	}
+	//	if e := mpI.Unmount(mount.MNT_DETACH); e != nil {
+	//		log.Printf("Failed to unmount %v: %v", mpI, e)
+	//		panic(e)
+	//	return err
 }
 
 // Boot uses kexec to boot into the target kernel.

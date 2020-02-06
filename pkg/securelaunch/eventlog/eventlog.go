@@ -98,6 +98,7 @@ func (e *EventLog) Persist() error {
 		return fmt.Errorf("empty eventlog path provided exiting")
 	}
 
+	// filePath, mp, r := slaunch.GetMountedFilePath(eventlogPath, 0) // 0 is flag value for rw mount option
 	filePath, mountPath, r := slaunch.GetMountedFilePath(eventlogPath, 0) // 0 is flag value for rw mount option
 	if r != nil {
 		return fmt.Errorf("failed to mount target disk for target=%s, err=%v", eventlogPath, r)
@@ -113,6 +114,10 @@ func (e *EventLog) Persist() error {
 			log.Printf("Unmount failed. PANIC")
 			panic(ret)
 		}
+		//if e := mp.Unmount(mount.MNT_DETACH); e != nil {
+		//	log.Printf("Failed to unmount %v: %v", mp, e)
+		//	panic(e)
+		//}
 		return fmt.Errorf("parseEvtLog err=%v", err)
 	}
 
@@ -122,6 +127,11 @@ func (e *EventLog) Persist() error {
 		log.Printf("Unmount failed. PANIC")
 		panic(ret)
 	}
+
+	//if e := mp.Unmount(mount.MNT_DETACH); e != nil {
+	//	log.Printf("Failed to unmount %v: %v", mp, e)
+	//	panic(e)
+	//}
 
 	if err != nil {
 		log.Printf("EventLog: Write err=%v, dst=%s, exiting", err, dst)
@@ -176,10 +186,15 @@ func (e *EventLog) Temp() error {
 		// write parsed data onto disk
 		target, err := slaunch.WriteToFile(data, dst, "simran.txt")
 	*/
+
 	if ret := mount.Unmount(mountPath, true, false); ret != nil {
 		log.Printf("Unmount failed. PANIC")
 		panic(ret)
 	}
+	//if e := mp.Unmount(mount.MNT_DETACH); e != nil {
+	//	log.Printf("Failed to unmount %v: %v", mp, e)
+	//	panic(e)
+	//}
 
 	if err != nil {
 		log.Printf("EventLog: Write err=%v, dst=%s, exiting", err, dst)

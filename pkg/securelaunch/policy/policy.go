@@ -56,6 +56,7 @@ func scanKernelCmdLine() []byte {
 	}
 
 	// val is of type sda:path/to/file or UUID:path/to/file
+	// mntFilePath, mp, e := slaunch.GetMountedFilePath(val, mount.MS_RDONLY) // false means readonly mount
 	mntFilePath, mountPath, e := slaunch.GetMountedFilePath(val, mount.MS_RDONLY) // false means readonly mount
 	if e != nil {
 		log.Printf("scanKernelCmdLine: GetMountedFilePath err=%v", e)
@@ -68,6 +69,10 @@ func scanKernelCmdLine() []byte {
 		log.Printf("Unmount failed. PANIC")
 		panic(e)
 	}
+	/*if e := mp.Unmount(mount.MNT_DETACH); e != nil {
+		log.Printf("Failed to unmount %v: %v", mp, e)
+		panic(e)
+	} */
 
 	if err != nil {
 		log.Printf("Error reading policy file:mountPath=%s, passed=%s", mntFilePath, val)
