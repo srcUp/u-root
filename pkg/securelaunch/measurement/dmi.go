@@ -146,14 +146,20 @@ func (s *DmiCollector) Collect(tpmHandle io.ReadWriteCloser) error {
 		return fmt.Errorf("failed to decode structures: %v", err)
 	}
 
+	//for _, s := range data {
+	//	log.Println("smbios: [", s, "]")
+	//}
+
 	var labels []string // collect all types entered by user in one slice
 	for _, fieldCluster := range s.Clusters {
 		labels = append(labels, fieldCluster.Label)
 	}
 
+	// log.Println("labels len=: [", len(labels), "]")
 	for _, k := range data { // k ==> data for each dmi type
 		// Only look at types mentioned in policy file.
 		for _, label := range labels {
+			// log.Println("k.Header.Type=[", k.Header.Type, "]  ", "type_table[label]=[", type_table[label], "]")
 			if k.Header.Type != type_table[label] {
 				continue
 			}
@@ -173,6 +179,8 @@ func (s *DmiCollector) Collect(tpmHandle io.ReadWriteCloser) error {
 				log.Printf("DMI Collector: err =%v", e)
 				return e
 			}
+			// break here maybe , so that we dont iterate over remaining labels for this structure from go-smbios
+			// log.Println("end of iteration of this label, ideally i should break here")
 		}
 	}
 
