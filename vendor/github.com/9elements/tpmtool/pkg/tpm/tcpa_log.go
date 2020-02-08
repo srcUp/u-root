@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	// "log"
 	"os"
 	"unicode/utf16"
 )
@@ -337,38 +338,56 @@ func readTPM2Log(firmware FirmwareType) (*PCRLog, error) {
 	}
 	defer file.Close()
 
+	//fileInfo, err := os.Stat(DefaultTCPABinaryLog)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//log.Printf("tpmtool: readTPM2log: The file %s is %d bytes long", DefaultTCPABinaryLog, fileInfo.Size())
+
 	pcrLog.Firmware = firmware
 
 	if pcrEvent, err := parseTcgPcrEvent(file); err != nil {
+		//log.Printf("tpmtool: readTPM2log: parseTcgPcrEvent returned error err =%v", err)
 		return nil, err
 	} else {
+		//log.Printf("tpmtool: readTPM2log: parseTcgPcrEvent else loop")
 		if efiSpecId, err := parseEfiSpecEvent(bytes.NewBuffer(pcrEvent.event)); efiSpecId == nil {
+			//log.Printf("tpmtool: readTPM2log: parseEfiSpecEvent loop")
 			if err != nil {
+				//log.Printf("tpmtool: readTPM2log: parseEfiSpecEvent err=%v", err)
 				return nil, err
 			} else {
+				//log.Printf("tpmtool: readTPM2log: first event not EFI Spec ID")
 				return nil, errors.New("First event was not an EFI SpecID Event")
 			}
 		}
 
+		//log.Printf("tpmtool: readTPM2log: appended pcrEvent to pcrList")
 		pcrLog.PcrList = append(pcrLog.PcrList, pcrEvent)
 	}
 
 	for {
 		pcrEvent, err := parseTcgPcrEvent2(file)
 		if err == io.EOF {
+			//log.Printf("tpmtool: readTPM2log: parseTcgPcrEvent2 err = io.EOF")
 			break
 		} else if err != nil {
+			//log.Printf("tpmtool: readTPM2log: parseTcgPcrEvent2 err = %v", err)
 			return nil, err
 		}
 
 		// There may be times when give part of the buffer past the last event,
 		// when that is the case just check to see if the event type is zero (reserved)
 		if pcrEvent.eventType == 0 {
+			//log.Printf("tpmtool: readTPM2log: parseTcgPcrEvent2 eventType = 0")
 			break
 		}
+
+		//log.Printf("tpmtool: readTPM2log: parseTcgPcrEvent2: appended pcrEvent to pcrList")
 		pcrLog.PcrList = append(pcrLog.PcrList, pcrEvent)
 	}
 
+	//log.Printf("tpmtool: readTPM2log: returning pcrLog")
 	return &pcrLog, nil
 }
 
@@ -443,13 +462,16 @@ func ParseLog(firmware FirmwareType, tpmSpec string) (*PCRLog, error) {
 	case TPM20:
 		pcrLog, err = readTPM2Log(firmware)
 		if err != nil {
+			//log.Printf("tpmtool: ParseLog readTPM2Log err=%v", err)
 			// Kernel eventlog workaround does not export agile measurement log..
 			pcrLog, err = readTPM1Log(firmware)
 			if err != nil {
+				//log.Printf("tpmtool: ParseLog readTPM1Log err=%v", err)
 				return nil, err
 			}
 		}
 	default:
+		//log.Printf("tpmtool: ParseLog default case err=No valid TPM specification found")
 		return nil, errors.New("No valid TPM specification found")
 	}
 
