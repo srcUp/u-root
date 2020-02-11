@@ -62,13 +62,13 @@ func measureStorageDevice(tpmHandle io.ReadWriteCloser, blkDevicePath string) er
 /*
  * Collect satisfies Collector Interface. It loops over all storage paths provided
  * by user and calls measureStorageDevice for each storage path. storage path is of
- * form UUID. measureStorageDevice in turn calls tpm
+ * form /dev/sda or UUID. measureStorageDevice in turn calls tpm
  * package which further hashes this buffer and extends pcr.
  */
 func (s *StorageCollector) Collect(tpmHandle io.ReadWriteCloser) error {
 
 	for _, inputVal := range s.Paths {
-		device, e := slaunch.GetStorageDevice(inputVal) // inputVal is blkDevicePath e.g UUID of a block device.
+		device, e := slaunch.GetStorageDevice(inputVal) // inputVal is blkDevicePath e.g UUID or /dev/sda
 		if e != nil {
 			log.Printf("NOTE: we accept sdX as name, not /dev/sdX in policy file.\n")
 			log.Printf("Storage Collector: input = %s, GetStorageDevice: err = %v", inputVal, e)

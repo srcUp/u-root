@@ -96,29 +96,28 @@ func GetDeviceFromUUID(uuid string) (storage.BlockDev, error) {
 }
 */
 
-//
-//func getDeviceFromName(name string) (storage.BlockDev, error) {
-//	if e := GetBlkInfo(); e != nil {
-//		return storage.BlockDev{}, fmt.Errorf("GetBlkInfo err=%s", e)
-//	}
-//	devices := storage.PartitionsByName(StorageBlkDevices, name) // []BlockDev
-//	Debug("%d device(s) matched with Name=%s", len(devices), name)
-//	for i, d := range devices {
-//		Debug("No#%d ,device=%s with fsUUID=%s", i, d.Name, d.FsUUID)
-//		return d, nil // return first device found
-//	}
-//	return storage.BlockDev{}, fmt.Errorf("no block device exists with name=%s", name)
-//}
+func getDeviceFromName(name string) (storage.BlockDev, error) {
+	if e := GetBlkInfo(); e != nil {
+		return storage.BlockDev{}, fmt.Errorf("GetBlkInfo err=%s", e)
+	}
+	devices := storage.PartitionsByName(StorageBlkDevices, name) // []BlockDev
+	Debug("%d device(s) matched with Name=%s", len(devices), name)
+	for i, d := range devices {
+		Debug("No#%d ,device=%s with fsUUID=%s", i, d.Name, d.FsUUID)
+		return d, nil // return first device found
+	}
+	return storage.BlockDev{}, fmt.Errorf("no block device exists with name=%s", name)
+}
 
 func GetStorageDevice(input string) (storage.BlockDev, error) {
 	device, e := getDeviceFromUUID(input)
 	if e != nil {
-		return storage.BlockDev{}, fmt.Errorf("fn getDeviceFromUUID: err = %v", e)
-		// d2, e2 := getDeviceFromName(input)
-		//if e2 != nil {
-		//	return storage.BlockDev{}, fmt.Errorf("getDeviceFromUUID: err=%v, getDeviceFromName: err=%v", e, e2)
-		//}
-		//device = d2
+		// return storage.BlockDev{}, fmt.Errorf("fn getDeviceFromUUID: err = %v", e)
+		d2, e2 := getDeviceFromName(input)
+		if e2 != nil {
+			return storage.BlockDev{}, fmt.Errorf("getDeviceFromUUID: err=%v, getDeviceFromName: err=%v", e, e2)
+		}
+		device = d2
 	}
 	return device, nil
 }

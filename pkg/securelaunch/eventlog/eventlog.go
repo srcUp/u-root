@@ -150,7 +150,8 @@ func (e *EventLog) Temp() error {
 	slaunch.Debug("Identified EventLog Type = file")
 
 	// e.Location is of the form sda:path/to/file.txt
-	eventlogPath := "65cfe18c-4f9b-402b-9ea6-4c68c856546e:/Daniel" // ovs112
+	eventlogPath := "sda2:/Daniel"
+	// eventlogPath := "65cfe18c-4f9b-402b-9ea6-4c68c856546e:/Daniel" // ovs112
 	// eventlogPath := "4fbbe726-80cb-4e66-9ce7-1199cb4299c4:/Daniel" // qemu loop device
 	if eventlogPath == "" {
 		return fmt.Errorf("empty eventlog path provided exiting")
