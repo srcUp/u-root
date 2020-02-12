@@ -28,25 +28,26 @@ type Launcher struct {
 // because we want to prevent TOCTOU error..time of check to time of use error.
 // we want to check the file close to the kexec load operation,
 // so keeping it in the same function as Load helps us prevent TOCTOU error..
-//func (l *Launcher) MeasureKernel(tpmDev io.ReadWriteCloser) error {
-//
-//	kernel := l.Params["kernel"]
-//	initrd := l.Params["initrd"]
-//
-//	if e := measurement.HashFile(tpmDev, kernel); e != nil {
-//		log.Printf("ERR: measure kernel input=%s, err=%v", kernel, e)
-//		return e
-//	}
-//
-//	if e := measurement.HashFile(tpmDev, initrd); e != nil {
-//		log.Printf("ERR: measure initrd input=%s, err=%v", initrd, e)
-//		return e
-//	}
-//	return nil
-//}
+func (l *Launcher) MeasureKernel(tpmDev io.ReadWriteCloser) error {
+
+	kernel := l.Params["kernel"]
+	initrd := l.Params["initrd"]
+
+	if e := measurement.HashFile(tpmDev, kernel); e != nil {
+		log.Printf("ERR: measure kernel input=%s, err=%v", kernel, e)
+		return e
+	}
+
+	if e := measurement.HashFile(tpmDev, initrd); e != nil {
+		log.Printf("ERR: measure initrd input=%s, err=%v", initrd, e)
+		return e
+	}
+	return nil
+}
 
 /*
- * Load loads the target kernel and initrd based on information provided
+ * // Load loads the target kernel and initrd based on information provided
+ * Boot boots the target kernel based on information provided
  * in the "launcher" section of policy file.
  *
  * Summary of steps:
@@ -58,7 +59,8 @@ type Launcher struct {
  * - if mount fails
  * - if kexec fails
  */
-func (l *Launcher) Load(tpmDev io.ReadWriteCloser) error {
+// func (l *Launcher) Load(tpmDev io.ReadWriteCloser) error {
+func (l *Launcher) Boot(tpmDev io.ReadWriteCloser) error {
 
 	if l.Type != "kexec" {
 		log.Printf("launcher: Unsupported launcher type. Exiting.")
@@ -73,15 +75,15 @@ func (l *Launcher) Load(tpmDev io.ReadWriteCloser) error {
 	cmdline := l.Params["cmdline"]
 
 	// slaunch.Debug("********Step 6: Measuring kernel, initrd ********") all steps moved to sluinit.
-	if e := measurement.HashFile(tpmDev, kernel); e != nil {
-		log.Printf("ERR: measure kernel input=%s, err=%v", kernel, e)
-		return e
-	}
-
-	if e := measurement.HashFile(tpmDev, initrd); e != nil {
-		log.Printf("ERR: measure initrd input=%s, err=%v", initrd, e)
-		return e
-	}
+	//	if e := measurement.HashFile(tpmDev, kernel); e != nil {
+	//		log.Printf("ERR: measure kernel input=%s, err=%v", kernel, e)
+	//		return e
+	//	}
+	//
+	//	if e := measurement.HashFile(tpmDev, initrd); e != nil {
+	//		log.Printf("ERR: measure initrd input=%s, err=%v", initrd, e)
+	//		return e
+	//	}
 
 	k, _, e := slaunch.GetMountedFilePath(kernel, mount.MS_RDONLY)
 	if e != nil {
@@ -105,21 +107,6 @@ func (l *Launcher) Load(tpmDev io.ReadWriteCloser) error {
 		return err
 	}
 
-	//	err := kexec.Reboot()
-	//	if err != nil {
-	//		log.Printf("kexec reboot failed. err=%v", err)
-	//	}
-	return nil
-}
-
-// Boot uses kexec to boot into the target kernel.
-func (l *Launcher) Boot(tpmDev io.ReadWriteCloser) error {
-
-	if l.Type != "kexec" {
-		log.Printf("launcher: Unsupported launcher type. Exiting.")
-		return fmt.Errorf("launcher: Unsupported launcher type. Exiting")
-	}
-
 	err := kexec.Reboot()
 	if err != nil {
 		log.Printf("kexec reboot failed. err=%v", err)
@@ -127,3 +114,19 @@ func (l *Launcher) Boot(tpmDev io.ReadWriteCloser) error {
 	}
 	return nil
 }
+
+// Boot uses kexec to boot into the target kernel.
+//func (l *Launcher) Boot(tpmDev io.ReadWriteCloser) error {
+//
+//	if l.Type != "kexec" {
+//		log.Printf("launcher: Unsupported launcher type. Exiting.")
+//		return fmt.Errorf("launcher: Unsupported launcher type. Exiting")
+//	}
+//
+//	err := kexec.Reboot()
+//	if err != nil {
+//		log.Printf("kexec reboot failed. err=%v", err)
+//		return err
+//	}
+//	return nil
+//}
