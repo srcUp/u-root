@@ -7,7 +7,10 @@ package eventlog
 
 import (
 	"fmt"
+	// "io/ioutil"
+	"io"
 	"log"
+	"os"
 	"strings"
 
 	"github.com/9elements/tpmtool/pkg/tpm"
@@ -105,5 +108,65 @@ func (e *EventLog) Persist() error {
 	}
 
 	slaunch.Debug("EventLog: success, data written to %s", target)
+	return nil
+}
+
+func (e *EventLog) Temp() error {
+
+	if e.Type != "file" {
+		return fmt.Errorf("unsupported eventlog type exiting")
+	}
+
+	slaunch.Debug("Identified EventLog Type = file")
+
+	// e.Location is of the form sda:path/to/file.txt
+	eventlogPath := "sda2:/Daniel"
+	if eventlogPath == "" {
+		return fmt.Errorf("empty eventlog path provided exiting")
+	}
+
+	filePath, mountPath, r := slaunch.GetMountedFilePath(eventlogPath, 0) // 0 is flag value for rw mount option
+	if r != nil {
+		return fmt.Errorf("failed to mount target disk for target=%s, err=%v", eventlogPath, r)
+	}
+
+	dst := filePath // /tmp/boot-733276578/evtlog
+	w, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+
+	f, err := os.Open(eventLogFile)
+	if err != nil {
+		return err
+	}
+
+	_, err = io.Copy(w, f)
+	w.Close()
+	f.Close()
+
+	/*
+		// read /sysfs file
+		data, err := ioutil.ReadFile(eventLogFile)
+		if err != nil {
+			log.Printf("err=%v", err)
+			return err
+		}
+
+		// write parsed data onto disk
+		target, err := slaunch.WriteToFile(data, dst, "simran.txt")
+	*/
+	if ret := mount.Unmount(mountPath, true, false); ret != nil {
+		log.Printf("Unmount failed. PANIC")
+		panic(ret)
+	}
+
+	if err != nil {
+		log.Printf("EventLog: Write err=%v, dst=%s, exiting", err, dst)
+		return fmt.Errorf("failed to write raw eventLog to disk, err=%v, dst=%s, exiting", err, dst)
+	}
+
+	slaunch.Debug("EventLog: success, data written to %s", dst)
+	// slaunch.Debug("EventLog: success, data written to %s", target)
 	return nil
 }

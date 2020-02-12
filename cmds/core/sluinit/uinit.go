@@ -73,6 +73,12 @@ func main() {
 	}
 	slaunch.Debug("Collectors completed")
 
+	slaunch.Debug("********Step *: Write raw eventlog to /boot partition*********")
+	if e := p.EventLog.Temp(); e != nil {
+		log.Printf("EventLog.Temp() failed err=%v", e)
+		os.Exit(1)
+	}
+
 	slaunch.Debug("********Step 4: Write eventlog to /boot partition*********")
 	if e := p.EventLog.Persist(); e != nil {
 		log.Printf("EventLog.Persist() failed err=%v", e)
