@@ -54,7 +54,9 @@ func measureStorageDevice(tpmHandle io.ReadWriteCloser, blkDevicePath string) er
 		return fmt.Errorf("couldn't open disk=%s err=%v", blkDevicePath, err)
 	}
 
-	return tpm.ExtendPCRDebug(tpmHandle, pcr, file)
+	eventDesc := []byte(fmt.Sprintf("Storage Collector: Measured %s", blkDevicePath))
+	slaunch.Debug(string(eventDesc))
+	return tpm.ExtendPCRDebug(tpmHandle, pcr, file, eventDesc)
 }
 
 /*

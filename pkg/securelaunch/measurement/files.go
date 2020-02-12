@@ -70,7 +70,9 @@ func HashFile(tpmHandle io.ReadWriteCloser, inputVal string) error {
 			mntFilePath, mountPath, inputVal, err)
 	}
 
-	return tpm.ExtendPCRDebug(tpmHandle, pcr, bytes.NewReader(d))
+	eventDesc := []byte(fmt.Sprintf("File Collector: measured %s", inputVal))
+	slaunch.Debug(string(eventDesc))
+	return tpm.ExtendPCRDebug(tpmHandle, pcr, bytes.NewReader(d), eventDesc)
 }
 
 /*
