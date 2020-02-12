@@ -79,11 +79,15 @@ func main() {
 		os.Exit(1)
 	}
 
-	slaunch.Debug("********Step 4: Measuring target kernel, initrd ********")
-	if e := p.Launcher.MeasureKernel(tpmDev); e != nil {
-		log.Printf("Launcher.MeasureKernel failed err=%v", e)
-		os.Exit(1)
-	}
+	//	slaunch.Debug("********Step 4: Measuring target kernel, initrd ********")
+	//	if e := p.Launcher.MeasureKernel(tpmDev); e != nil {
+	//		log.Printf("Launcher.MeasureKernel failed err=%v", e)
+	//		os.Exit(1)
+	//	}
+
+	slaunch.Debug("********Step 4: Launcher called to Load ********")
+	err = p.Launcher.Load(tpmDev)
+	log.Printf("Launcher failed. err=%s", err)
 
 	slaunch.Debug("********Step 5: Write eventlog to /boot partition*********")
 	if e := p.EventLog.Persist(); e != nil {
