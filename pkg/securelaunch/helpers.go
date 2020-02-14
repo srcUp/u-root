@@ -18,6 +18,16 @@ import (
 	"github.com/u-root/u-root/pkg/storage"
 )
 
+type persistDataItem struct {
+	// callback func([]byte, string) error
+	desc        string // Description
+	data        []byte
+	location    string // of form sda:/path/to/file
+	defaultFile string // if location turns out to be dir only
+}
+
+var persistData []persistDataItem
+
 /* used to store all block devices returned from a call to storage.GetBlockStats */
 var StorageBlkDevices []storage.BlockDev
 
@@ -66,13 +76,48 @@ func WriteToFile(data []byte, dst, defFileName string) (string, error) {
 		Debug("New target=%s", target)
 	}
 
-	Debug("target=%s", target)
+	Debug("WriteToFile: target=%s", target)
 	err = ioutil.WriteFile(target, data, 0644)
 	if err != nil {
 		return "", fmt.Errorf("failed to write date to file =%s, err=%v", target, err)
 	}
-	Debug("WriteToFile exit w success data written to target=%s", target)
+	Debug("WriteToFile: exit w success data written to target=%s", target)
 	return target, nil
+}
+
+// TargetPath is of form sda:/boot/cpuid.txt
+func persist(data []byte, targetPath string, defaultFile string) error {
+
+	filePath, _, r := GetMountedFilePath(targetPath, 0) // 0 is flag for rw mount option
+	if r != nil {
+		return fmt.Errorf("persist: err: input %s could NOT be located, err=%v", targetPath, r)
+	}
+
+	dst := filePath // /tmp/boot-733276578/cpuid
+
+	target, err := WriteToFile(data, dst, defaultFile)
+	if err != nil {
+		log.Printf("persist: err=%s", err)
+		return err
+	}
+
+	Debug("persist: Target File%s", target)
+	return nil
+}
+
+func AddToPersistQueue(desc string, data []byte, location string, defFile string) error {
+	persistData = append(persistData, persistDataItem{desc, data, location, defFile})
+	return nil
+}
+
+func ClearPersistQueue() error {
+
+	for _, entry := range persistData {
+		if err := persist(entry.data, entry.location, entry.defaultFile); err != nil {
+			return fmt.Errorf("%s: persist failed for location %s", entry.desc, entry.location)
+		}
+	}
+	return nil
 }
 
 func getDeviceFromUUID(uuid string) (storage.BlockDev, error) {
@@ -169,6 +214,13 @@ func getDeviceFromName(name string) (storage.BlockDev, error) {
 	return storage.BlockDev{}, fmt.Errorf("no block device exists with name=%s", name)
 }
 */
+func deleteEntryMountCache(key string) {
+	mountCache.mu.Lock()
+	delete(mountCache.m, key)
+	mountCache.mu.Unlock()
+
+	Debug("mountCache: Deleted key %s", key)
+}
 
 func setMountCache(key string, val mountCacheData) {
 
@@ -202,7 +254,8 @@ func getMountCacheData(key string, flags uintptr) (string, error) {
 			panic(e)
 		}
 		Debug("mountCache: unmount successfull. lets clean up it's entry in map")
-		setMountCache(key, mountCacheData{})
+		deleteEntryMountCache(key)
+		// setMountCache(key, mountCacheData{})
 		Debug("mountCache: declare this as a failed lookup since we need to mount again")
 		return "", fmt.Errorf("device was already mounted. Mount again.")
 	}
@@ -292,12 +345,18 @@ func MountDevice(device storage.BlockDev, flags uintptr) (string, error) {
 */
 
 func UnmountAll() {
-	for _, mountCacheData := range mountCache.m {
+
+	Debug("UnmountAll: %d devices need to be unmounted", len(mountCache.m))
+	for key, mountCacheData := range mountCache.m {
 		cachedMountPath := mountCacheData.mountPath
+		Debug("UnmountAll: Unmounting %s", cachedMountPath)
 		if e := mount.Unmount(cachedMountPath, true, false); e != nil {
 			log.Printf("Unmount failed for %s. PANIC", cachedMountPath)
 			panic(e)
 		}
+		Debug("UnmountAll: Unmounted %s", cachedMountPath)
+		deleteEntryMountCache(key)
+		Debug("UnmountAll: Deleted key %s from cache", key)
 	}
 }
 
