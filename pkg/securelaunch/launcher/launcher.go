@@ -31,6 +31,9 @@ type Launcher struct {
 // because we want to prevent TOCTOU error..time of check to time of use error.
 // we want to check the file close to the kexec load operation,
 // so keeping it in the same function as Load helps us prevent TOCTOU error..
+
+// MeasureKernel calls file collector in measurement pkg that
+// hashes kernel, initrd files and even store these hashes in tpm pcrs.
 func (l *Launcher) MeasureKernel(tpmDev io.ReadWriteCloser) error {
 
 	kernel := l.Params["kernel"]
