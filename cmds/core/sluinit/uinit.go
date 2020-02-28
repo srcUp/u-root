@@ -49,12 +49,14 @@ func checkDebugFlag() {
 func main() {
 	checkDebugFlag()
 
+	defer unmountAndExit() // called only on error, on success we kexec
 	slaunch.Debug("********Step 1: init completed. starting main ********")
 	tpmDev, err := tpm.GetHandle()
 	if err != nil {
 		log.Printf("tpm.getHandle failed. err=%v", err)
-		unmountAndExit()
 		// os.Exit(1)
+		// unmountAndExit()
+		return
 	}
 	defer tpmDev.Close()
 
@@ -62,8 +64,9 @@ func main() {
 	p, err := policy.Get(tpmDev)
 	if err != nil {
 		log.Printf("failed to get policy err=%v", err)
-		unmountAndExit()
+		// unmountAndExit()
 		// os.Exit(1)
+		return
 	}
 	slaunch.Debug("policy file successfully parsed")
 
@@ -79,15 +82,17 @@ func main() {
 	slaunch.Debug("********Step *: Add raw eventlog to Persist Queue*********")
 	if e := p.EventLog.Temp(); e != nil {
 		log.Printf("EventLog.Temp() failed err=%v", e)
-		unmountAndExit()
+		// unmountAndExit()
 		// os.Exit(1)
+		return
 	}
 
 	slaunch.Debug("********Step 4: Measuring target kernel, initrd ********")
 	if e := p.Launcher.MeasureKernel(tpmDev); e != nil {
 		log.Printf("Launcher.MeasureKernel failed err=%v", e)
-		unmountAndExit()
+		// unmountAndExit()
 		// os.Exit(1)
+		return
 	}
 
 	//	slaunch.Debug("********Step 4: Launcher called to Load ********")
@@ -97,14 +102,16 @@ func main() {
 	slaunch.Debug("********Step 5: Parse eventlogs *********")
 	if e := p.EventLog.Parse(); e != nil {
 		log.Printf("EventLog.Parse() failed err=%v", e)
-		unmountAndExit()
+		// unmountAndExit()
 		// os.Exit(1)
+		return
 	}
 
 	slaunch.Debug("*****Step 6: Dump items to disk by clearing PersistData queue *******")
 	if e := slaunch.ClearPersistQueue(); e != nil {
 		log.Printf("ClearPersistQueue failed err=%v", e)
-		unmountAndExit()
+		// unmountAndExit()
+		return
 	}
 
 	slaunch.Debug("********Step *: Unmount all (not needed ?) ********")
@@ -113,7 +120,8 @@ func main() {
 	slaunch.Debug("********Step 7: Launcher called to Boot ********")
 	if err := p.Launcher.Boot(tpmDev); err != nil {
 		log.Printf("Boot failed. err=%s", err)
-		unmountAndExit()
+		// unmountAndExit()
+		return
 	}
 }
 
