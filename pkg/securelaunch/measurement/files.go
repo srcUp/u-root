@@ -61,10 +61,10 @@ func HashFile(tpmHandle io.ReadWriteCloser, inputVal string) error {
 
 	slaunch.Debug("File Collector: fileP=%s, mountP=%s\n", mntFilePath, mountPath)
 	d, err := ioutil.ReadFile(mntFilePath)
-	if e := mount.Unmount(mountPath, true, false); e != nil {
-		log.Printf("File Collector: Unmount failed. PANIC\n")
-		panic(e)
-	}
+	//	if e := mount.Unmount(mountPath, true, false); e != nil {
+	//		log.Printf("File Collector: Unmount failed. PANIC\n")
+	//		panic(e)
+	//	}
 	/*
 		if e := mp.Unmount(mount.MNT_DETACH); e != nil {
 			log.Printf("Failed to unmount %v: %v", mp, e)

@@ -56,7 +56,8 @@ func scanKernelCmdLine() []byte {
 
 	// val is of type sda:path/to/file or UUID:path/to/file
 	// mntFilePath, mp, e := slaunch.GetMountedFilePath(val, mount.MS_RDONLY) // false means readonly mount
-	mntFilePath, mountPath, e := slaunch.GetMountedFilePath(val, mount.MS_RDONLY) // false means readonly mount
+	// mntFilePath, mountPath, e := slaunch.GetMountedFilePath(val, mount.MS_RDONLY) // false means readonly mount
+	mntFilePath, _, e := slaunch.GetMountedFilePath(val, mount.MS_RDONLY) // false means readonly mount
 	if e != nil {
 		log.Printf("scanKernelCmdLine: GetMountedFilePath err=%v", e)
 		return nil
@@ -64,10 +65,10 @@ func scanKernelCmdLine() []byte {
 	slaunch.Debug("scanKernelCmdLine: Reading file=%s", mntFilePath)
 
 	d, err := ioutil.ReadFile(mntFilePath)
-	if e := mount.Unmount(mountPath, true, false); e != nil {
-		log.Printf("Unmount failed. PANIC")
-		panic(e)
-	}
+	//	if e := mount.Unmount(mountPath, true, false); e != nil {
+	//		log.Printf("Unmount failed. PANIC")
+	//		panic(e)
+	//	}
 	/*if e := mp.Unmount(mount.MNT_DETACH); e != nil {
 		log.Printf("Failed to unmount %v: %v", mp, e)
 		panic(e)
@@ -142,33 +143,44 @@ func locate() ([]byte, error) {
 
 	// devicePath = /dev/sda, mountPath = /tmp/sluinit-FOO/
 	for _, device := range slaunch.StorageBlkDevices {
-		devicePath := filepath.Join("/dev", device.Name)
-		slaunch.Debug("Attempting to mount %s", devicePath)
-		mountPath, err := ioutil.TempDir("/tmp", "slaunch-")
-		if err != nil {
-			return nil, fmt.Errorf("failed to create tmp mount directory: %v", err)
-		}
 
-		if _, err := device.Mount(mountPath, mount.MS_RDONLY); err != nil {
-			log.Printf("failed to mount %s, continuing to next block device", devicePath)
+		devName := device.Name
+		mountPath, err := slaunch.MountDevice(device, mount.MS_RDONLY)
+		if err != nil {
+			log.Printf("failed to mount %s, continuing to next block device", devName)
 			continue
 		}
-		// slaunch.Debug("mp.Path=%s, mountPath=%s", mp.Path, mountPath) verified they are equal
 
-		slaunch.Debug("Mounted %s", devicePath)
-		slaunch.Debug("scanning for policy file under devicePath=%s, mountPath=%s", devicePath, mountPath)
+		//		devicePath := filepath.Join("/dev", device.Name)
+		//		slaunch.Debug("Attempting to mount %s", devicePath)
+		//		mountPath, err := ioutil.TempDir("/tmp", "slaunch-")
+		//		if err != nil {
+		//			return nil, fmt.Errorf("failed to create tmp mount directory: %v", err)
+		//		}
+		//
+		//		if _, err := device.Mount(mountPath, mount.MS_RDONLY); err != nil {
+		//			log.Printf("failed to mount %s, continuing to next block device", devicePath)
+		//			continue
+		//		}
+		//		// slaunch.Debug("mp.Path=%s, mountPath=%s", mp.Path, mountPath) verified they are equal
+		//
+		//		slaunch.Debug("Mounted %s", devicePath)
+		//		slaunch.Debug("scanning for policy file under devicePath=%s, mountPath=%s", devicePath, mountPath)
+
+		slaunch.Debug("scanning for policy file under devName=%s, mountPath=%s", devName, mountPath)
 		raw := scanBlockDevice(mountPath)
-		if e := mount.Unmount(mountPath, true, false); e != nil {
-			log.Printf("Unmount failed. PANIC")
-			panic(e)
-		}
+		//		if e := mount.Unmount(mountPath, true, false); e != nil {
+		//			log.Printf("Unmount failed. PANIC")
+		//			panic(e)
+		//		}
 
 		if raw == nil {
 			log.Printf("no policy file found under this device")
 			continue
 		}
 
-		slaunch.Debug("policy file found at devicePath=%s", devicePath)
+		// slaunch.Debug("policy file found at devicePath=%s", devicePath)
+		slaunch.Debug("policy file found at devName=%s", devName)
 		return raw, nil
 	}
 

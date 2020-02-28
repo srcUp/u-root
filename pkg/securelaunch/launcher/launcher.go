@@ -89,14 +89,16 @@ func (l *Launcher) Boot(tpmDev io.ReadWriteCloser) error {
 	//	}
 
 	//k, mpK, e := slaunch.GetMountedFilePath(kernel, mount.MS_RDONLY)
-	k, kMountPath, e := slaunch.GetMountedFilePath(kernel, mount.MS_RDONLY)
+	// k, kMountPath, e := slaunch.GetMountedFilePath(kernel, mount.MS_RDONLY)
+	k, _, e := slaunch.GetMountedFilePath(kernel, mount.MS_RDONLY)
 	if e != nil {
 		log.Printf("launcher: ERR: kernel input %s couldnt be located, err=%v", kernel, e)
 		return e
 	}
 
 	// i, mpI, e := slaunch.GetMountedFilePath(initrd, mount.MS_RDONLY)
-	i, iMountPath, e := slaunch.GetMountedFilePath(initrd, mount.MS_RDONLY)
+	// i, iMountPath, e := slaunch.GetMountedFilePath(initrd, mount.MS_RDONLY)
+	i, _, e := slaunch.GetMountedFilePath(initrd, mount.MS_RDONLY)
 	if e != nil {
 		log.Printf("launcher: ERR: initrd input %s couldnt be located, err=%v", initrd, e)
 		return e
@@ -186,14 +188,14 @@ func (l *Launcher) Boot(tpmDev io.ReadWriteCloser) error {
 	return nil
 ERR:
 	// On error, unmount the files on disk holding kernel and initrd files
-	if e := mount.Unmount(kMountPath, true, false); e != nil {
-		log.Printf("Unmount failed. PANIC")
-		panic(e)
-	}
-	if e := mount.Unmount(iMountPath, true, false); e != nil {
-		log.Printf("Unmount failed. PANIC")
-		panic(e)
-	}
+	//	if e := mount.Unmount(kMountPath, true, false); e != nil {
+	//		log.Printf("Unmount failed. PANIC")
+	//		panic(e)
+	//	}
+	//	if e := mount.Unmount(iMountPath, true, false); e != nil {
+	//		log.Printf("Unmount failed. PANIC")
+	//		panic(e)
+	//	}
 	return err
 	//ERR:
 	//	if e := mpK.Unmount(mount.MNT_DETACH); e != nil {

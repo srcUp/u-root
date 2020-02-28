@@ -13,7 +13,7 @@ import (
 	"strings"
 
 	"github.com/intel-go/cpuid"
-	"github.com/u-root/u-root/pkg/mount"
+	// "github.com/u-root/u-root/pkg/mount"
 	slaunch "github.com/u-root/u-root/pkg/securelaunch"
 	"github.com/u-root/u-root/pkg/securelaunch/tpm"
 )
@@ -132,7 +132,8 @@ func persist(data []byte, cpuidTargetPath string) error {
 
 	// cpuidTargetPath is of form sda:/boot/cpuid.txt
 	// filePath, mp, r := slaunch.GetMountedFilePath(cpuidTargetPath, 0) // 0 is flag for rw mount option
-	filePath, mountPath, r := slaunch.GetMountedFilePath(cpuidTargetPath, 0) // 0 is flag for rw mount option
+	// filePath, mountPath, r := slaunch.GetMountedFilePath(cpuidTargetPath, 0) // 0 is flag for rw mount option
+	filePath, _, r := slaunch.GetMountedFilePath(cpuidTargetPath, 0) // 0 is flag for rw mount option
 	if r != nil {
 		return fmt.Errorf("EventLog: ERR: input %s could NOT be located, err=%v", cpuidTargetPath, r)
 	}
@@ -140,10 +141,10 @@ func persist(data []byte, cpuidTargetPath string) error {
 	dst := filePath // /tmp/boot-733276578/cpuid
 
 	target, err := slaunch.WriteToFile(data, dst, defaultCPUIDFile)
-	if ret := mount.Unmount(mountPath, true, false); ret != nil {
-		log.Printf("Unmount failed. PANIC")
-		panic(ret)
-	}
+	//	if ret := mount.Unmount(mountPath, true, false); ret != nil {
+	//		log.Printf("Unmount failed. PANIC")
+	//		panic(ret)
+	//	}
 	/*
 		if e := mp.Unmount(mount.MNT_DETACH); e != nil {
 			log.Printf("Failed to unmount %v: %v", mp, e)

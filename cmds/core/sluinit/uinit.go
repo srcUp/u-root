@@ -52,7 +52,8 @@ func main() {
 	tpmDev, err := tpm.GetHandle()
 	if err != nil {
 		log.Printf("tpm.getHandle failed. err=%v", err)
-		os.Exit(1)
+		unmountAndExit()
+		// os.Exit(1)
 	}
 	defer tpmDev.Close()
 
@@ -60,7 +61,8 @@ func main() {
 	p, err := policy.Get()
 	if err != nil {
 		log.Printf("failed to get policy err=%v", err)
-		os.Exit(1)
+		unmountAndExit()
+		// os.Exit(1)
 	}
 	slaunch.Debug("policy file successfully parsed")
 
@@ -76,13 +78,15 @@ func main() {
 	slaunch.Debug("********Step *: Write raw eventlog to /boot partition*********")
 	if e := p.EventLog.Temp(); e != nil {
 		log.Printf("EventLog.Temp() failed err=%v", e)
-		os.Exit(1)
+		unmountAndExit()
+		// os.Exit(1)
 	}
 
 	slaunch.Debug("********Step 4: Measuring target kernel, initrd ********")
 	if e := p.Launcher.MeasureKernel(tpmDev); e != nil {
 		log.Printf("Launcher.MeasureKernel failed err=%v", e)
-		os.Exit(1)
+		unmountAndExit()
+		// os.Exit(1)
 	}
 
 	//	slaunch.Debug("********Step 4: Launcher called to Load ********")
@@ -92,10 +96,20 @@ func main() {
 	slaunch.Debug("********Step 5: Write eventlog to /boot partition*********")
 	if e := p.EventLog.Persist(); e != nil {
 		log.Printf("EventLog.Persist() failed err=%v", e)
-		os.Exit(1)
+		unmountAndExit()
+		// os.Exit(1)
 	}
+	slaunch.Debug("********Step *: Unmount all ********")
+	slaunch.UnmountAll()
 
 	slaunch.Debug("********Step 6: Launcher called to Boot ********")
-	err = p.Launcher.Boot(tpmDev)
-	log.Printf("Boot failed. err=%s", err)
+	if err := p.Launcher.Boot(tpmDev); err != nil {
+		log.Printf("Boot failed. err=%s", err)
+		unmountAndExit()
+	}
+}
+
+func unmountAndExit() {
+	slaunch.UnmountAll()
+	os.Exit(1)
 }
