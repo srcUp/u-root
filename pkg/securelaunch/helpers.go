@@ -392,12 +392,14 @@ func GetMountedFilePath(inputVal string, flags uintptr) (string, string, error) 
 	//	}
 
 	devName := device.Name
-	mountPath, err := MountDevice(device, flags)
+	var dev storage.BlockDev                  // inject error so that mount fails...
+	mountPath, err := MountDevice(dev, flags) // inject error so that mount fails...
+
+	// mountPath, err := MountDevice(device, flags)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to mount %s , flags=%v, err=%v", devName, flags, err)
 	}
 
-	// var dev storage.BlockDev // inject error so that mount fails...
 	// if _, err := dev.Mount(mountPath, flags); err != nil { // inject error so that mount fails...
 
 	// if _, err := device.Mount(mountPath, flags); err != nil {
