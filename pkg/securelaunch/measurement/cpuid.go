@@ -111,9 +111,9 @@ func getCPUIDInfo() []byte {
  * measureCPUIDFile stores the CPUIDInfo obtained from cpuid package
  * into the tpm device */
 func measureCPUIDFile(tpmHandle io.ReadWriteCloser) ([]byte, error) {
-
 	d := getCPUIDInfo() // return strings builder
-	if e := tpm.ExtendPCRDebug(tpmHandle, pcr, bytes.NewReader(d)); e != nil {
+	eventDesc := "CPUID Collector: Measured CPUID Info"
+	if e := tpm.ExtendPCRDebug(tpmHandle, pcr, bytes.NewReader(d), eventDesc); e != nil {
 		return nil, e
 	}
 
